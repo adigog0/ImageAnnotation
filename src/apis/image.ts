@@ -1,3 +1,4 @@
+import type { MetaData } from "../pages/ImageDetailsPage";
 import axios, { BASE_URL } from "./axios.global";
 
 export const uploadImage = async (file: FormData) => {
@@ -16,5 +17,17 @@ export const getAllImages = async () => {
 
 export const getImageById = async (image_id: string) => {
   const response = await axios.get(`${BASE_URL}/api/${image_id}`);
+  return response;
+};
+
+export const saveAllMetaDataByImageId = async (image_Id: string, metaData: MetaData[]) => {
+  const response = await axios.put(`${BASE_URL}/api/metaData/${image_Id}`, {
+    metaData: metaData,
+  });
+  return response;
+};
+
+export const getMetaDataByImageId = async (image_Id: string) => {
+  const response = await axios.get(`${BASE_URL}/api/metadata/${image_Id}`);
   return response;
 };

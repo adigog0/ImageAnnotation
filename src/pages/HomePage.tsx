@@ -42,7 +42,7 @@ const HomePage = () => {
   }, [openModal]);
 
   return (
-    <div className="h-dvh flex p-10">
+    <div className="h-dvh flex p-10 ">
       <SideNavBar />
       <div className="w-full flex flex-col">
         <Header handleAddNewImage={handleClickAddNewImage} />
