@@ -7,7 +7,11 @@ import AddAnnotation from "../components/annotation/AddAnnotation";
 import { v4 as uuid } from "uuid";
 import SideBar from "../components/SideBar/SideBar";
 import CommentCard from "../components/commentCard/CommentCard";
-import ActionToolbar, { type ActionTypes } from "../components/actionToolBar/ActionToolBar";
+import type { ActionTypes } from "../components/actionToolBar/ActionToolbar";
+import ActionToolbar from "../components/actionToolBar/ActionToolbar";
+import { calculateDistance } from "../utils/calculateDistance";
+import SketchCanvas from "../components/sketchCanvas/SketchCanvas";
+import { cn } from "../lib/tailwind";
 
 type metaDataCtx = {
   metaData: MetaData[];
@@ -50,6 +54,7 @@ export const ImageDetailsPage = () => {
   const { imageId } = useParams();
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
   const sideBarRef = useRef<HTMLDivElement | null>(null);
+  const actionRef = useRef<HTMLDivElement | null>(null);
 
   //const
   const safeZoneRefs = [sideBarRef];
@@ -61,7 +66,7 @@ export const ImageDetailsPage = () => {
   }
 
   function handleAddAnnotation(e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
-    if (selectedActions !== "Add Comment") return;
+    if (selectedActions !== "Add comment") return;
     setOffsetValue(null);
     e.stopPropagation();
     const imageElem = document.getElementById("current_image");
@@ -120,33 +125,84 @@ export const ImageDetailsPage = () => {
 
   function handleEditMetaData() {}
 
-  function handleDraw() {}
+  function handleDraw() {
+    handleHideAllMetadata();
+  }
 
-  function handleHideComment() {}
+  function handleGetNearestElems(e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
+    if (selectedActions !== "Nearest tags") return;
 
-  function handleNearestTag() {}
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mouseX = ((e.clientX - Math.round(rect.left)) / rect.width) * 100;
+    const mouseY = ((e.clientY - Math.round(rect.top)) / rect.height) * 100;
+
+    // threshold (e.g., only show if within 20px)
+    const THRESHOLD = 20;
+
+    metaData.forEach((v) => {
+      let minDist = calculateDistance(mouseX, mouseY, v.offsetx, v.offsety);
+      const tagEl = document.getElementById(`metadata_id_${v.metadata_id}`);
+      if (!tagEl) return;
+      if (minDist <= THRESHOLD) {
+        tagEl.style.visibility = "visible";
+      } else {
+        tagEl.style.visibility = "hidden";
+      }
+    });
+  }
+
+  function handleNearestTag() {
+    handleHideAllMetadata();
+  }
+
+  function handleHideAllMetadata() {
+    const elements = document.querySelectorAll('[id^="metadata_id_"]');
+    elements.forEach((el) => {
+      if (el instanceof HTMLElement) {
+        el.style.visibility = "hidden";
+      }
+    });
+  }
+
+  function showAllMetadata() {
+    const elements = document.querySelectorAll('[id^="metadata_id_"]');
+    elements.forEach((el) => {
+      if (el instanceof HTMLElement) {
+        el.style.visibility = "visible";
+      }
+    });
+  }
 
   function handleSelectedAction(actionType: ActionTypes) {
-    setSelectedActions(actionType);
-    switch (actionType) {
-      case "Add Comment":
-        handleEnableComment();
-        break;
-      case "Draw":
-        handleDraw();
-        break;
-      case "Hide Comments":
-        handleHideComment();
-        break;
-      case "Nearest Tags":
-        handleNearestTag();
-        break;
-      case "Save Comments":
-        handleSaveMetaData();
-        break;
-      default:
-        break;
-    }
+    setSelectedActions((prev) => {
+      const isSameAction = prev === actionType;
+      showAllMetadata();
+      switch (actionType) {
+        case "Add comment":
+          handleEnableComment();
+          break;
+        case "Draw":
+          handleDraw();
+          break;
+        case "Hide comments":
+          isSameAction ? showAllMetadata() : handleHideAllMetadata();
+          break;
+        case "Nearest tags":
+          handleNearestTag();
+          break;
+        case "Save comments":
+          handleSaveMetaData();
+          break;
+        default:
+          break;
+      }
+
+      return isSameAction ? null : actionType;
+    });
+  }
+
+  function handleSetMainAction() {
+    setSelectedActions(null);
   }
 
   const handleAddComment = useCallback(
@@ -219,10 +275,11 @@ export const ImageDetailsPage = () => {
     const handleClickOutside = (e: MouseEvent) => {
       const clickedInSafeZone = safeZoneRefs.some((ref) => ref.current?.contains(e.target as HTMLDivElement));
       const clickedInImageContainer = imageContainerRef.current?.contains(e.target as HTMLDivElement);
+      const clickedInActionContainer = actionRef.current?.contains(e.target as HTMLDivElement);
 
-      if (!clickedInImageContainer && !clickedInSafeZone) {
+      if (!clickedInImageContainer && !clickedInSafeZone && !clickedInActionContainer) {
         console.log("Clicked outside all safe zones");
-        setSelectedActions(null);
+        // setSelectedActions(null);
         setOffsetValue(null);
       }
     };
@@ -241,7 +298,7 @@ export const ImageDetailsPage = () => {
   return (
     <imageMetaDataCtx.Provider value={{ curSelectedMetaDataId, metaData, setMetaData, handleAddComment }}>
       <div className="h-screen flex flex-row relative">
-        {(selectedActions === "Add Comment" || curSelectedMetaDataId) && (
+        {(selectedActions === "Add comment" || curSelectedMetaDataId) && (
           <SideBar width="20rem" className="hidden md:block absolute">
             <div className="h-full shadow-md" ref={sideBarRef}>
               <div className="p-3 border-b border-gray-300 text-sm font-semibold">Comments</div>
@@ -270,31 +327,40 @@ export const ImageDetailsPage = () => {
             </div>
           </SideBar>
         )}
-        <div className="p-9 flex flex-col justify-center  h-full items-center gap-3 flex-1">
-          <ActionToolbar selectedActions={selectedActions} handleSelectedAction={handleSelectedAction} />
-
+        <div className="flex-1 md:flex flex-col justify-center items-center gap-3">
           <div
-            className="relative max-w-[70rem]  flex justify-center border"
+            className="relative w-[70rem] h-9/12 flex justify-center"
             ref={imageContainerRef}
             onDragOver={(e) => {
               e.preventDefault();
             }}
           >
-            <img
-              className="relative"
-              src={imageData?.image_url}
-              id="current_image"
-              style={{
-                cursor: selectedActions === "Add Comment" ? "url('/icons/addCommentIcon.svg') 1 30, auto" : "auto",
-              }}
-              onClick={(e) => handleAddAnnotation(e)}
-              onDragOver={(e) => {
-                e.preventDefault();
-              }}
-            />
+            {imageData && selectedActions === "Draw" ? (
+              <SketchCanvas image={imageData?.image_url} handleSetMainAction={handleSetMainAction} />
+            ) : (
+              <img
+                className="relative"
+                src={imageData?.image_url}
+                id="current_image"
+                style={{
+                  cursor: selectedActions === "Add comment" ? "url('/icons/addCommentIcon.svg') 1 30, auto" : "auto",
+                }}
+                onClick={(e) => handleAddAnnotation(e)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                }}
+                onMouseMove={(e) => handleGetNearestElems(e)}
+              />
+            )}
+            {selectedActions !== "Draw" && (
+              <div ref={actionRef} className="absolute -top-12">
+                <ActionToolbar selectedActions={selectedActions} handleSelectedAction={handleSelectedAction} />
+              </div>
+            )}
+
             {imageData && metaData.length > 0 && <MetaDataAnnotationLayer handleClickMetaData={handleClickMetaData} />}
 
-            {selectedActions === "Add Comment" && offsetValue && (
+            {selectedActions === "Add comment" && offsetValue && (
               <AddAnnotation offsetValues={offsetValue} handleAddMetadata={handleAddMetadata} />
             )}
           </div>
