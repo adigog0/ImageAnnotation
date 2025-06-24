@@ -1,23 +1,35 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getImageById, getMetaDataByImageId, saveAllMetaDataByImageId } from "../apis/image";
+import {
+  getImageById,
+  getImagePath,
+  getMetaDataByImageId,
+  saveAllMetaDataByImageId,
+  updateImagePathByImageId,
+} from "../apis/image";
 import type { ImagesData } from "./ImageGallery";
 import MetaDataAnnotationLayer from "../components/metaDataAnnotationsLayer/MetaDataAnnotationLayer";
 import AddAnnotation from "../components/annotation/AddAnnotation";
 import { v4 as uuid } from "uuid";
-import SideBar from "../components/SideBar/SideBar";
-import CommentCard from "../components/commentCard/CommentCard";
 import type { ActionTypes } from "../components/actionToolBar/ActionToolbar";
 import ActionToolbar from "../components/actionToolBar/ActionToolbar";
 import { calculateDistance } from "../utils/calculateDistance";
 import SketchCanvas from "../components/sketchCanvas/SketchCanvas";
 import { cn } from "../lib/tailwind";
+import { useResponsiveCanvasSize } from "../hooks/useResponsiveCanvasSize";
+import { type CanvasPath } from "react-sketch-canvas";
+import { toast } from "react-toastify";
+import { denormalizePaths, normalizePaths } from "../utils/constants";
+import CommentSideBar from "../components/commentComponents/CommentSideBar";
+import PathOverlay from "../components/pathOverlay/PathOverlay";
 
 type metaDataCtx = {
   metaData: MetaData[];
   setMetaData: React.Dispatch<React.SetStateAction<MetaData[]>>;
   curSelectedMetaDataId: string | null;
   handleAddComment: (val: string, type: "new" | "sub") => void;
+  selectedAction: ActionTypes | null;
+  setSelectedAction: React.Dispatch<React.SetStateAction<ActionTypes | null>>;
 };
 const imageMetaDataCtx = createContext<null | metaDataCtx>(null);
 
@@ -38,10 +50,13 @@ export type MetaData = {
   updated_at?: Date | string;
 };
 
+const MAX_WIDTH = 1120;
+const MAX_HEIGHT = 720;
+
 export const ImageDetailsPage = () => {
   //state
   const [imageData, setImageData] = useState<ImagesData | null>(null);
-  const [selectedActions, setSelectedActions] = useState<ActionTypes | null>(null);
+  const [selectedAction, setSelectedAction] = useState<ActionTypes | null>(null);
   const [metaData, setMetaData] = useState<MetaData[]>([]);
   const [offsetValue, setOffsetValue] = useState<{
     x: number;
@@ -49,12 +64,14 @@ export const ImageDetailsPage = () => {
     value: string;
   } | null>(null);
   const [curSelectedMetaDataId, setCurSelectedMetaDataId] = useState<string | null>(null);
+  const [canvasPaths, setCanvasPaths] = useState<CanvasPath[]>([]);
 
   //hooks
   const { imageId } = useParams();
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
   const sideBarRef = useRef<HTMLDivElement | null>(null);
   const actionRef = useRef<HTMLDivElement | null>(null);
+  const { width, height } = useResponsiveCanvasSize(imageData?.image_url ?? "", MAX_WIDTH, MAX_HEIGHT);
 
   //const
   const safeZoneRefs = [sideBarRef];
@@ -65,8 +82,9 @@ export const ImageDetailsPage = () => {
     setOffsetValue(null);
   }
 
-  function handleAddAnnotation(e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
-    if (selectedActions !== "Add comment") return;
+  function handleAddAnnotation(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
+    setCurSelectedMetaDataId(null);
+    if (selectedAction !== "Add comment") return;
     setOffsetValue(null);
     e.stopPropagation();
     const imageElem = document.getElementById("current_image");
@@ -74,14 +92,11 @@ export const ImageDetailsPage = () => {
       const rect = imageElem.getBoundingClientRect();
       const x = ((e.clientX - Math.round(rect.left)) / rect.width) * 100;
       const y = ((e.clientY - Math.round(rect.top)) / rect.height) * 100;
-      // const x = e.clientX - Math.round(rect.left);
-      // const y = e.clientY - Math.round(rect.top);
       setOffsetValue({
         x,
         y,
         value: "",
       });
-      setCurSelectedMetaDataId(null);
     }
   }
 
@@ -95,9 +110,8 @@ export const ImageDetailsPage = () => {
   }
 
   function handleClickMetaData(e: React.MouseEvent<HTMLDivElement, MouseEvent>, id: string) {
-    console.log("clicked metadata");
     e.stopPropagation();
-    setSelectedActions(null);
+    setSelectedAction(null);
     setOffsetValue(null);
     setCurSelectedMetaDataId(id);
 
@@ -129,25 +143,20 @@ export const ImageDetailsPage = () => {
     handleHideAllMetadata();
   }
 
-  function handleGetNearestElems(e: React.MouseEvent<HTMLImageElement, MouseEvent>) {
-    if (selectedActions !== "Nearest tags") return;
+  function handleGetNearestElems(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
+    if (selectedAction !== "Nearest tags") return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = ((e.clientX - Math.round(rect.left)) / rect.width) * 100;
     const mouseY = ((e.clientY - Math.round(rect.top)) / rect.height) * 100;
 
-    // threshold (e.g., only show if within 20px)
     const THRESHOLD = 20;
 
     metaData.forEach((v) => {
-      let minDist = calculateDistance(mouseX, mouseY, v.offsetx, v.offsety);
+      const minDist = calculateDistance(mouseX, mouseY, v.offsetx, v.offsety);
       const tagEl = document.getElementById(`metadata_id_${v.metadata_id}`);
       if (!tagEl) return;
-      if (minDist <= THRESHOLD) {
-        tagEl.style.visibility = "visible";
-      } else {
-        tagEl.style.visibility = "hidden";
-      }
+      tagEl.style.visibility = minDist <= THRESHOLD ? "visible" : "hidden";
     });
   }
 
@@ -166,6 +175,7 @@ export const ImageDetailsPage = () => {
 
   function showAllMetadata() {
     const elements = document.querySelectorAll('[id^="metadata_id_"]');
+    console.log(elements);
     elements.forEach((el) => {
       if (el instanceof HTMLElement) {
         el.style.visibility = "visible";
@@ -174,9 +184,8 @@ export const ImageDetailsPage = () => {
   }
 
   function handleSelectedAction(actionType: ActionTypes) {
-    setSelectedActions((prev) => {
+    setSelectedAction((prev) => {
       const isSameAction = prev === actionType;
-      showAllMetadata();
       switch (actionType) {
         case "Add comment":
           handleEnableComment();
@@ -188,7 +197,7 @@ export const ImageDetailsPage = () => {
           isSameAction ? showAllMetadata() : handleHideAllMetadata();
           break;
         case "Nearest tags":
-          handleNearestTag();
+          isSameAction ? showAllMetadata() : handleNearestTag();
           break;
         case "Save comments":
           handleSaveMetaData();
@@ -202,7 +211,12 @@ export const ImageDetailsPage = () => {
   }
 
   function handleSetMainAction() {
-    setSelectedActions(null);
+    setSelectedAction(null);
+    showAllMetadata();
+  }
+
+  function handleUpdateImagePath(path: CanvasPath[]) {
+    setCanvasPaths(path);
   }
 
   const handleAddComment = useCallback(
@@ -248,21 +262,31 @@ export const ImageDetailsPage = () => {
   );
 
   async function handleSaveMetaData() {
-    await saveAllMetaDataByImageId(imageId ?? "", metaData);
+    const res = await saveAllMetaDataByImageId(imageId ?? "", metaData);
+    if (res.status === 200) {
+      const normalisedPaths = normalizePaths(canvasPaths, width, height);
+      await updateImagePathByImageId(imageId ?? "", JSON.stringify(normalisedPaths));
+      toast.success("Metadata succesfully saved!");
+    } else {
+      toast.error("Error in saving metadata!");
+    }
   }
 
   async function fetchImageById() {
     if (!imageId) return;
-    const imageData = await getImageById(imageId);
-    setImageData(imageData.data[0]);
-    fetchMetaDataByImageId();
+    const res = await getImageById(imageId);
+    setImageData(res.data[0]);
   }
 
   async function fetchMetaDataByImageId() {
     const res = await getMetaDataByImageId(imageId ?? "");
-    console.log(res.data);
-    if (res.data) {
+    if (res.data.length > 0) {
       setMetaData(res.data);
+      const pathRes = await getImagePath(imageId ?? "");
+      if (pathRes.data.length > 0) {
+        const denormalisedPaths = denormalizePaths(JSON.parse(pathRes.data[0].image_paths), width, height);
+        setCanvasPaths(denormalisedPaths);
+      }
     }
   }
 
@@ -273,98 +297,87 @@ export const ImageDetailsPage = () => {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      const clickedInSafeZone = safeZoneRefs.some((ref) => ref.current?.contains(e.target as HTMLDivElement));
-      const clickedInImageContainer = imageContainerRef.current?.contains(e.target as HTMLDivElement);
-      const clickedInActionContainer = actionRef.current?.contains(e.target as HTMLDivElement);
+      if (!selectedAction) return;
+      const clickedInSafeZone = safeZoneRefs.some((ref) => ref.current?.contains(e.target as Node));
+      const clickedInImageContainer = imageContainerRef.current?.contains(e.target as Node);
+      const clickedInActionContainer = actionRef.current?.contains(e.target as Node);
 
       if (!clickedInImageContainer && !clickedInSafeZone && !clickedInActionContainer) {
-        console.log("Clicked outside all safe zones");
-        // setSelectedActions(null);
         setOffsetValue(null);
       }
     };
 
-    if (selectedActions) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (imageData && width > 0 && height > 0) {
+      fetchMetaDataByImageId();
     }
+  }, [imageData, width, height]);
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [selectedActions]);
-
+  console.log("selected action",selectedAction)
   return (
-    <imageMetaDataCtx.Provider value={{ curSelectedMetaDataId, metaData, setMetaData, handleAddComment }}>
+    <imageMetaDataCtx.Provider
+      value={{ curSelectedMetaDataId, metaData, setMetaData, handleAddComment, selectedAction, setSelectedAction }}
+    >
       <div className="h-screen flex flex-row relative">
-        {(selectedActions === "Add comment" || curSelectedMetaDataId) && (
-          <SideBar width="20rem" className="hidden md:block absolute">
-            <div className="h-full shadow-md" ref={sideBarRef}>
-              <div className="p-3 border-b border-gray-300 text-sm font-semibold">Comments</div>
-              <div className="p-3 gap-5 flex flex-col">
-                <input
-                  placeholder="Search"
-                  className="w-full h-full outline-none border border-gray-300 py-1 px-2 rounded-lg"
-                />
-
-                {metaData.map(
-                  (c) =>
-                    c.parent_id === null && (
-                      <CommentCard
-                        key={c.metadata_id}
-                        type="fromList"
-                        comment={c}
-                        curSelectedMetaDataId={curSelectedMetaDataId ?? ""}
-                        handleDeleteMetaDataById={handleDeleteMetaDataById}
-                        handleEditComment={handleEditMetaData}
-                        getTotalSubCommentCount={getTotalSubCommentCount}
-                        handleClickMetaData={handleClickMetaData}
-                      />
-                    )
-                )}
-              </div>
-            </div>
-          </SideBar>
+        {(selectedAction === "All comments" || curSelectedMetaDataId) && (
+          <CommentSideBar
+            getTotalSubCommentCount={getTotalSubCommentCount}
+            handleClickMetaData={handleClickMetaData}
+            handleDeleteMetaDataById={handleDeleteMetaDataById}
+            handleEditMetaData={handleEditMetaData}
+            ref={sideBarRef}
+          />
         )}
-        <div className="flex-1 md:flex flex-col justify-center items-center gap-3">
+        <div className="flex flex-1 flex-col justify-center items-center gap-3">
           <div
-            className="relative w-[70rem] h-9/12 flex justify-center"
-            ref={imageContainerRef}
-            onDragOver={(e) => {
-              e.preventDefault();
+            style={{
+              width: width,
+              height: height,
+              cursor: selectedAction === "Add comment" ? "url('/icons/addCommentIcon.svg') 1 30, auto" : "auto",
             }}
+            className={cn("relative flex justify-center items-center")}
+            ref={imageContainerRef}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={(e) => handleAddAnnotation(e)}
+            onMouseMove={(e) => handleGetNearestElems(e)}
           >
-            {imageData && selectedActions === "Draw" ? (
-              <SketchCanvas image={imageData?.image_url} handleSetMainAction={handleSetMainAction} />
-            ) : (
-              <img
-                className="relative"
-                src={imageData?.image_url}
-                id="current_image"
-                style={{
-                  cursor: selectedActions === "Add comment" ? "url('/icons/addCommentIcon.svg') 1 30, auto" : "auto",
-                }}
-                onClick={(e) => handleAddAnnotation(e)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                }}
-                onMouseMove={(e) => handleGetNearestElems(e)}
+            {imageData && (
+              <SketchCanvas
+                image={imageData?.image_url}
+                handleSetMainAction={handleSetMainAction}
+                handleUpdatePath={handleUpdateImagePath}
+                canvasPath={canvasPaths}
               />
             )}
-            {selectedActions !== "Draw" && (
-              <div ref={actionRef} className="absolute -top-12">
-                <ActionToolbar selectedActions={selectedActions} handleSelectedAction={handleSelectedAction} />
-              </div>
+            {selectedAction !== "Draw" && (
+              <PathOverlay
+                hideAllPaths={selectedAction === "Hide Paths" ? true : false}
+                paths={canvasPaths}
+                canvasWidth={width}
+                canvasHeight={height}
+                denormalize={({ x, y }) => ({
+                  x: x,
+                  y: y,
+                })}
+              />
             )}
 
             {imageData && metaData.length > 0 && <MetaDataAnnotationLayer handleClickMetaData={handleClickMetaData} />}
 
-            {selectedActions === "Add comment" && offsetValue && (
+            {selectedAction === "Add comment" && offsetValue && (
               <AddAnnotation offsetValues={offsetValue} handleAddMetadata={handleAddMetadata} />
             )}
           </div>
         </div>
+        {selectedAction !== "Draw" && (
+          <div ref={actionRef} className="absolute bottom-0 left-1/2 -translate-2/4">
+            <ActionToolbar handleSelectedAction={handleSelectedAction} />
+          </div>
+        )}
       </div>
     </imageMetaDataCtx.Provider>
   );

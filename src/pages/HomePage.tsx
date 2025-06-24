@@ -43,7 +43,7 @@ const HomePage = () => {
 
   return (
     <div className="h-dvh flex p-5">
-      <SideNavBar />
+      {/* <SideNavBar /> */}
       <div className="w-full flex flex-col">
         <Header handleAddNewImage={handleClickAddNewImage} />
         <ImageGallery imagesData={allImages} />

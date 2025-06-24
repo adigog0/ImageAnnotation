@@ -31,3 +31,15 @@ export const getMetaDataByImageId = async (image_Id: string) => {
   const response = await axios.get(`${BASE_URL}/api/metadata/${image_Id}`);
   return response;
 };
+
+export const updateImagePathByImageId = async (image_id: string, path: string) => {
+  const response = await axios.post(`${BASE_URL}/api/images-path/${image_id}`, {
+    path: path,
+  });
+  return response;
+};
+
+export const getImagePath = async (image_id: string) => {
+  const response = await axios.get(`${BASE_URL}/api/path/${image_id}`);
+  return response;
+};

@@ -2,26 +2,23 @@ import { format } from "date-fns";
 import { useMetaDataCtx } from "../../pages/ImageDetailsPage";
 import { cn } from "../../lib/tailwind";
 import CommentListDisplay from "../commentListDisplay/CommentListDisplay";
+import { useMemo } from "react";
 
 interface IProps {
   handleClickMetaData: (e: React.MouseEvent<HTMLDivElement, MouseEvent>, id: string) => void;
 }
 
 const MetaDataAnnotationLayer = ({ handleClickMetaData }: IProps) => {
-  //const
+  //context
   const { curSelectedMetaDataId, metaData, setMetaData } = useMetaDataCtx();
 
-  //methods
-  function handleGetAllSubComments() {
-    if (curSelectedMetaDataId) {
-      const modifiedArr = metaData.filter(
-        (v) => v.metadata_id === curSelectedMetaDataId || v.parent_id === curSelectedMetaDataId
-      );
-      return modifiedArr;
-    }
-    return [];
-  }
+  //const
+  const subComments = useMemo(() => {
+    if (!curSelectedMetaDataId) return [];
+    return metaData.filter((v) => v.metadata_id === curSelectedMetaDataId || v.parent_id === curSelectedMetaDataId);
+  }, [curSelectedMetaDataId, metaData]);
 
+  //methods
   function handleOnDragEnd(e: React.DragEvent<HTMLDivElement>) {
     const currentImage = document.getElementById("current_image");
     const draggedElemId = e.currentTarget.id.split("_")[2];
@@ -76,7 +73,7 @@ const MetaDataAnnotationLayer = ({ handleClickMetaData }: IProps) => {
                 className={cn(
                   "absolute group flex rounded-t-3xl rounded-br-3xl  -translate-y-full cursor-default",
                   curSelectedMetaDataId && curSelectedMetaDataId === v.metadata_id
-                    ? "bg-transparent z-50"
+                    ? "bg-transparent z-20"
                     : "bg-white z-10"
                 )}
                 onClick={(e) => handleClickMetaData(e, v.metadata_id)}
@@ -92,10 +89,7 @@ const MetaDataAnnotationLayer = ({ handleClickMetaData }: IProps) => {
                 onPointerOver={(e) => (e.currentTarget.style.cursor = "default")}
               >
                 {curSelectedMetaDataId && v.metadata_id === curSelectedMetaDataId ? (
-                  <CommentListDisplay
-                    comments={handleGetAllSubComments()}
-                    handleDeleteMetaDataById={handleDeleteMetaDataById}
-                  />
+                  <CommentListDisplay comments={subComments} handleDeleteMetaDataById={handleDeleteMetaDataById} />
                 ) : (
                   <div className="p-1 flex">
                     <div className="bg-blue-400  text-white p-1 px-2.5 h-fit capitalize rounded-full group-hover:m-2">
@@ -103,7 +97,7 @@ const MetaDataAnnotationLayer = ({ handleClickMetaData }: IProps) => {
                     </div>
                     <div
                       className={cn(
-                        "hidden group-hover:block bg-white text-black m-2  max-w-[10rem] overflow-hidden",
+                        "transition-all duration-300 hidden group-hover:block bg-white text-black m-2  max-w-[10rem] overflow-hidden",
                         curSelectedMetaDataId ? "z-0" : "z-1"
                       )}
                     >

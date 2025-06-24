@@ -26,12 +26,12 @@ const ImageUpload = ({ setUploadedFile, uploadedFile }: IProps) => {
   return (
     <>
       {uploadedFile ? (
-        <div className="p-2">
+        <div className="p-2 max-h-[40rem] overflow-auto">
           <img src={URL.createObjectURL(uploadedFile)} />
         </div>
       ) : (
         <div className=" border-2 border-dotted border-gray-200 p-10">
-          <div className="flex flex-col justify-center items-center gap-10">
+          <div className="flex flex-col justify-center items-center gap-10 ">
             {loading ? (
               <div className="p-2">loading..</div>
             ) : (

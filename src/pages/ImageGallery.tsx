@@ -26,7 +26,7 @@ const ImageGallery = ({ imagesData }: IProps) => {
 
   console.log("curlocation", curlocation);
   return (
-    <div className="w-full flex-1 p-9">
+    <div className="w-full flex-1 md:p-9">
       <div className="flex h-full gap-7">
         {imagesData.map((v, i) => (
           <Card

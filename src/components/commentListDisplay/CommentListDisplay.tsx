@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { useMetaDataCtx, type MetaData } from "../../pages/ImageDetailsPage";
 import CommentInputBox from "../commentInputBox/CommentInputBox";
 import OptionIcon from "../../assets/icons/optionsDot.svg?react";
@@ -8,7 +7,7 @@ import { cn } from "../../lib/tailwind";
 import CustomMenu from "../customMenu/CustomMenu";
 import CommentCard from "../commentCard/CommentCard";
 
-const parentCommentOptions = ["Hide comment", "Delete"] as const;
+const parentCommentOptions = ["Hide Comments", "Delete"] as const;
 
 const commentOptions = ["Edit", "Delete"] as const;
 
@@ -33,13 +32,12 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
 
   //const
   const parentData = comments.find((c) => c.metadata_id === curSelectedMetaDataId);
+  if (!parentData) return null;
 
   const CommentOptionsHandlerMap: CommentHandlerMap = {
     Edit: handleEditComment,
     Delete: handleDeleteMetaDataById,
   };
-
-  if (!parentData) return null;
 
   //method
   function handleAddSubComment(val: string) {
@@ -48,24 +46,30 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
 
   function handleOpenOptionMenu(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
     setMenuAnchor(e.currentTarget);
-  }
+  } 
 
   function handleCloseOptionMenu() {
     setMenuAnchor(null);
   }
 
   function handleGenerateCommentOptions() {
-    if (menuAnchor && menuAnchor.id.startsWith("parent_comment_options")) {
+    if (menuAnchor?.dataset.menuType === "parent") {
       return parentCommentOptions;
     } else return commentOptions;
   }
 
+  // function getlistHandler(e: React.MouseEvent<HTMLSpanElement, MouseEvent>) {
+  //   return CommentOptionsHandlerMap[e.currentTarget.id as keyof typeof CommentOptionsHandlerMap]();
+  // }
+
   function getlistHandler(e: React.MouseEvent<HTMLSpanElement, MouseEvent>) {
-    return CommentOptionsHandlerMap[e.currentTarget.id as keyof typeof CommentOptionsHandlerMap]();
+    const option = e.currentTarget.id as keyof typeof CommentOptionsHandlerMap;
+    const id = curSelectedMetaDataId ?? "";
+    CommentOptionsHandlerMap[option](id);
   }
 
   function handleEditComment(id: string) {
-    console.log("edit hit");
+    console.log("edit hit", id);
     handleCloseOptionMenu();
   }
 
@@ -76,10 +80,10 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
   }, [comments.length]);
 
   return (
-    <div className="flex gap-3 relative">
+    <div className="flex gap-3 relative ">
       <div
         className={cn(
-          "bg-white p-1 rounded-t-3xl rounded-br-3xl h-fit ",
+          "bg-white p-1 rounded-t-3xl rounded-br-3xl h-fit",
           parentData.metadata_id === curSelectedMetaDataId ? "border-2 border-blue-400" : "bg-white"
         )}
       >
@@ -87,16 +91,18 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
           {parentData.created_by[0]}
         </div>
       </div>
+      {/** desktop view menu */}
       <div
         className={cn(
-          "bg-white p-2 rounded-md  flex flex-col gap-2 absolute left-13 ",
-          curSelectedMetaDataId === parentData.metadata_id ? "z-50" : "z-10"
+          "bg-white p-2 rounded-md  flex-col gap-2 absolute left-13 hidden md:block",
+          curSelectedMetaDataId === parentData.metadata_id ? "z-20" : "z-10"
         )}
       >
         <div className="flex justify-between items-center">
           <span className="border-gray-500 text-xs text-gray-400">Comment</span>
           <button
-            id={`parent_comment_options_${curSelectedMetaDataId}`}
+            data-menu-type="parent"
+            // id={`parent_comment_options_${curSelectedMetaDataId}`}
             className="ml-auto  hover:bg-gray-200 rounded-md relative"
             onClick={handleOpenOptionMenu}
           >
@@ -123,15 +129,14 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
 
         <CommentInputBox handleInputValue={handleAddSubComment} input_placeholder="Reply" initial_value="" />
       </div>
+
+      {/** mobile view  - when a comment is selected*/}
+      <div className="block md:hidden bg-amber-50">comment mobile view</div>
+
       <CustomMenu handleClose={handleCloseOptionMenu} buttonRef={menuAnchor}>
-        <div className="flex flex-col ">
+        <div className="flex flex-col w-full">
           {handleGenerateCommentOptions().map((c) => (
-            <span
-              key={c}
-              id={c}
-              className="text-xs hover:bg-gray-200 py-1 px-5 w-full"
-              onClick={(e) => getlistHandler(e)}
-            >
+            <span key={c} id={c} className="text-xs hover:bg-gray-200 py-1 px-5 " onClick={(e) => getlistHandler(e)}>
               {c}
             </span>
           ))}

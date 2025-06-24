@@ -7,7 +7,7 @@ function App() {
   return (
     <>
       <RouterProvider router={router} />
-      <ToastContainer hideProgressBar position="bottom-left" limit={5} autoClose={1000} />
+      <ToastContainer hideProgressBar position="top-right" limit={5} autoClose={1000} />
     </>
   )
 }

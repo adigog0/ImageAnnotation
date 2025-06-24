@@ -47,7 +47,7 @@ const CustomMenu = ({ buttonRef, handleClose, children }: CustomMenuProps) => {
   return (
     <div
       ref={menuContainerRef}
-      className="absolute z-50 bg-white rounded-md py-2 max-w-[20rem] shadow-md"
+      className="absolute z-50 bg-white rounded-md py-2 shadow-md"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,

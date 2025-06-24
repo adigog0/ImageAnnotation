@@ -1,9 +1,9 @@
 import Axios from "axios";
 
-export const BASE_URL = "http://localhost:5000"
+export const BASE_URL = "http://192.168.29.84:5000";
 
 let axios = Axios.create({
-  baseURL:BASE_URL ,
+  baseURL: BASE_URL,
 });
 
 axios.interceptors.request.use((config) => {
@@ -12,6 +12,6 @@ axios.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-}); 
+});
 
 export default axios;
