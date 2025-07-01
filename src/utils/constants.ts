@@ -1,4 +1,4 @@
-import { type CanvasPath } from "react-sketch-canvas";
+import { type CanvasPath, type Point } from "react-sketch-canvas";
 
 export const normalizePaths = (paths: CanvasPath[], width: number, height: number): CanvasPath[] => {
   return paths.map((path) => ({
@@ -19,3 +19,30 @@ export const denormalizePaths = (paths: CanvasPath[], width: number, height: num
     })),
   }));
 };
+
+export function getResponsiveDefaults() {
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  return {
+    maxWidth: isMobile ? 600 : 1120,
+    maxHeight: isMobile ? 580 : 720,
+  };
+}
+
+export function isPathIntersecting(pathA: CanvasPath, pathB: CanvasPath): boolean {
+  const threshold = (pathA.strokeWidth + pathB.strokeWidth) / 2 + 5; // adjust buffer as needed
+
+  for (const pointA of pathA.paths) {
+    for (const pointB of pathB.paths) {
+      const dx = pointA.x - pointB.x;
+      const dy = pointA.y - pointB.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist <= threshold) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

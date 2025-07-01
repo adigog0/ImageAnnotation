@@ -1,77 +1,66 @@
-import { useMetaDataCtx, type MetaData } from "../../pages/ImageDetailsPage";
-import CommentInputBox from "../commentInputBox/CommentInputBox";
-import OptionIcon from "../../assets/icons/optionsDot.svg?react";
 import { useEffect, useRef, useState } from "react";
-import CloseIcon from "../../assets/icons/close.svg?react";
 import { cn } from "../../lib/tailwind";
 import CustomMenu from "../customMenu/CustomMenu";
 import CommentCard from "../commentCard/CommentCard";
+import CommentInputBox from "../commentInputBox/CommentInputBox";
+import type { MetaData } from "../../types/constant";
+import { useAnnotatorContext } from "../../context/AnnotatorContext";
+import CloseIcon from "../../assets/icons/close.svg?react";
+import OptionIcon from "../../assets/icons/optionsDot.svg?react";
 
 const parentCommentOptions = ["Hide Comments", "Delete"] as const;
-
 const commentOptions = ["Edit", "Delete"] as const;
 
 type CommentOption = (typeof commentOptions)[number];
-
 type CommentHandlerMap = {
-  [key in CommentOption]: (...args: any[]) => void;
+  [key in CommentOption]: (id: string) => void;
 };
 
-interface IProps {
+interface CommentListDisplayProps {
   comments: MetaData[];
-  handleDeleteMetaDataById: (id: string) => void;
 }
 
-const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
-  //state
+const CommentListDisplay = ({ comments }: CommentListDisplayProps) => {
+  //states
   const [menuAnchor, setMenuAnchor] = useState<HTMLButtonElement | null>(null);
 
-  //hook
-  const { curSelectedMetaDataId, handleAddComment } = useMetaDataCtx();
+  //hooks
   const endRef = useRef<HTMLDivElement | null>(null);
+  const { curSelectedMetaDataId, handleDeleteMetaData, onEdit, handleAddComment } = useAnnotatorContext();
 
   //const
-  const parentData = comments.find((c) => c.metadata_id === curSelectedMetaDataId);
-  if (!parentData) return null;
-
   const CommentOptionsHandlerMap: CommentHandlerMap = {
     Edit: handleEditComment,
-    Delete: handleDeleteMetaDataById,
+    Delete: handleDeleteMetaData,
   };
 
-  //method
-  function handleAddSubComment(val: string) {
-    handleAddComment(val, "sub");
+  //methods
+  function handleEditComment(id: string) {
+    onEdit(id);
+    handleCloseOptionMenu();
   }
 
-  function handleOpenOptionMenu(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
+  function handleOpenOptionMenu(e: React.MouseEvent<HTMLButtonElement>) {
     setMenuAnchor(e.currentTarget);
-  } 
+  }
 
   function handleCloseOptionMenu() {
     setMenuAnchor(null);
   }
 
   function handleGenerateCommentOptions() {
-    if (menuAnchor?.dataset.menuType === "parent") {
-      return parentCommentOptions;
-    } else return commentOptions;
+    return menuAnchor?.dataset.menuType === "parent" ? parentCommentOptions : commentOptions;
   }
 
-  // function getlistHandler(e: React.MouseEvent<HTMLSpanElement, MouseEvent>) {
-  //   return CommentOptionsHandlerMap[e.currentTarget.id as keyof typeof CommentOptionsHandlerMap]();
-  // }
+  function handleAddSubComment(val: string) {
+    handleAddComment(val, "sub");
+  }
 
-  function getlistHandler(e: React.MouseEvent<HTMLSpanElement, MouseEvent>) {
+  const getlistHandler = (e: React.MouseEvent<HTMLSpanElement>) => {
     const option = e.currentTarget.id as keyof typeof CommentOptionsHandlerMap;
     const id = curSelectedMetaDataId ?? "";
     CommentOptionsHandlerMap[option](id);
-  }
-
-  function handleEditComment(id: string) {
-    console.log("edit hit", id);
-    handleCloseOptionMenu();
-  }
+  };
 
   useEffect(() => {
     if (comments.length > 0) {
@@ -79,6 +68,9 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
     }
   }, [comments.length]);
 
+  const parentData = comments.find((c) => c.metadata_id === curSelectedMetaDataId);
+  if (!parentData) return null;
+  
   return (
     <div className="flex gap-3 relative ">
       <div
@@ -120,8 +112,6 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
               type="fromTag"
               comment={c}
               curSelectedMetaDataId={curSelectedMetaDataId ?? ""}
-              handleDeleteMetaDataById={handleDeleteMetaDataById}
-              handleEditComment={handleEditComment}
             />
           ))}
           <div ref={endRef}></div>
@@ -131,8 +121,6 @@ const CommentListDisplay = ({ comments, handleDeleteMetaDataById }: IProps) => {
       </div>
 
       {/** mobile view  - when a comment is selected*/}
-      <div className="block md:hidden bg-amber-50">comment mobile view</div>
-
       <CustomMenu handleClose={handleCloseOptionMenu} buttonRef={menuAnchor}>
         <div className="flex flex-col w-full">
           {handleGenerateCommentOptions().map((c) => (

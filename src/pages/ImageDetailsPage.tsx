@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   getImageById,
@@ -22,6 +22,9 @@ import { toast } from "react-toastify";
 import { denormalizePaths, normalizePaths } from "../utils/constants";
 import CommentSideBar from "../components/commentComponents/CommentSideBar";
 import PathOverlay from "../components/pathOverlay/PathOverlay";
+import BottomCommentMenu from "../components/bottomContentMenu/BottomContentMenu";
+import type { MetaData } from "../types/constant";
+import Annotator from "./Annotator";
 
 type metaDataCtx = {
   metaData: MetaData[];
@@ -30,7 +33,11 @@ type metaDataCtx = {
   handleAddComment: (val: string, type: "new" | "sub") => void;
   selectedAction: ActionTypes | null;
   setSelectedAction: React.Dispatch<React.SetStateAction<ActionTypes | null>>;
+  handleHideAllMetadata: () => void;
+  handleDeSelectMetadata: () => void;
+  showAllMetadata: () => void;
 };
+
 const imageMetaDataCtx = createContext<null | metaDataCtx>(null);
 
 export function useMetaDataCtx() {
@@ -38,17 +45,6 @@ export function useMetaDataCtx() {
   if (ctx === null) throw new Error("MetaData info ctx cannot be used outside its provider");
   return ctx;
 }
-
-export type MetaData = {
-  metadata_id: string;
-  parent_id: string | null;
-  metadata_value: string;
-  offsetx: number;
-  offsety: number;
-  created_at: Date | string;
-  created_by: string;
-  updated_at?: Date | string;
-};
 
 const MAX_WIDTH = 1120;
 const MAX_HEIGHT = 720;
@@ -65,6 +61,7 @@ export const ImageDetailsPage = () => {
   } | null>(null);
   const [curSelectedMetaDataId, setCurSelectedMetaDataId] = useState<string | null>(null);
   const [canvasPaths, setCanvasPaths] = useState<CanvasPath[]>([]);
+  const [openBottomMenu, setOpenBottomMenu] = useState(false);
 
   //hooks
   const { imageId } = useParams();
@@ -75,16 +72,22 @@ export const ImageDetailsPage = () => {
 
   //const
   const safeZoneRefs = [sideBarRef];
+  const subComments = useMemo(() => {
+    if (!curSelectedMetaDataId) return [];
+    return metaData.filter((v) => v.metadata_id === curSelectedMetaDataId || v.parent_id === curSelectedMetaDataId);
+  }, [curSelectedMetaDataId, metaData]);
 
   //methods
 
   function handleEnableComment() {
     setOffsetValue(null);
+    showAllMetadata();
   }
 
   function handleAddAnnotation(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
     setCurSelectedMetaDataId(null);
     if (selectedAction !== "Add comment") return;
+    handleOpenBottomMenu();
     setOffsetValue(null);
     e.stopPropagation();
     const imageElem = document.getElementById("current_image");
@@ -101,6 +104,7 @@ export const ImageDetailsPage = () => {
   }
 
   function handleAddMetadata(val: string) {
+    console.log("add metadata called", val);
     if (val.trim() === "") return;
     setOffsetValue((prev) => ({
       ...prev!,
@@ -111,6 +115,7 @@ export const ImageDetailsPage = () => {
 
   function handleClickMetaData(e: React.MouseEvent<HTMLDivElement, MouseEvent>, id: string) {
     e.stopPropagation();
+    handleOpenBottomMenu();
     setSelectedAction(null);
     setOffsetValue(null);
     setCurSelectedMetaDataId(id);
@@ -175,7 +180,6 @@ export const ImageDetailsPage = () => {
 
   function showAllMetadata() {
     const elements = document.querySelectorAll('[id^="metadata_id_"]');
-    console.log(elements);
     elements.forEach((el) => {
       if (el instanceof HTMLElement) {
         el.style.visibility = "visible";
@@ -219,6 +223,19 @@ export const ImageDetailsPage = () => {
     setCanvasPaths(path);
   }
 
+  function handleDeSelectMetadata() {
+    setCurSelectedMetaDataId(null);
+  }
+
+  function handleCloseBottomMenu() {
+    setOpenBottomMenu(false);
+    setOffsetValue(null);
+  }
+
+  function handleOpenBottomMenu() {
+    setOpenBottomMenu(true);
+  }
+
   const handleAddComment = useCallback(
     (val: string, type: "new" | "sub") => {
       console.log("handle add sun comment data", val, type, offsetValue);
@@ -252,7 +269,6 @@ export const ImageDetailsPage = () => {
           created_by: "Unknown2",
         };
       }
-      console.log("adding metadata", tmpObj);
       if (tmpObj) {
         setMetaData((prev) => [...prev, tmpObj]);
         setOffsetValue(null);
@@ -301,7 +317,6 @@ export const ImageDetailsPage = () => {
       const clickedInSafeZone = safeZoneRefs.some((ref) => ref.current?.contains(e.target as Node));
       const clickedInImageContainer = imageContainerRef.current?.contains(e.target as Node);
       const clickedInActionContainer = actionRef.current?.contains(e.target as Node);
-
       if (!clickedInImageContainer && !clickedInSafeZone && !clickedInActionContainer) {
         setOffsetValue(null);
       }
@@ -317,69 +332,117 @@ export const ImageDetailsPage = () => {
     }
   }, [imageData, width, height]);
 
-  console.log("selected action",selectedAction)
   return (
-    <imageMetaDataCtx.Provider
-      value={{ curSelectedMetaDataId, metaData, setMetaData, handleAddComment, selectedAction, setSelectedAction }}
-    >
-      <div className="h-screen flex flex-row relative">
-        {(selectedAction === "All comments" || curSelectedMetaDataId) && (
-          <CommentSideBar
-            getTotalSubCommentCount={getTotalSubCommentCount}
-            handleClickMetaData={handleClickMetaData}
-            handleDeleteMetaDataById={handleDeleteMetaDataById}
-            handleEditMetaData={handleEditMetaData}
-            ref={sideBarRef}
-          />
-        )}
-        <div className="flex flex-1 flex-col justify-center items-center gap-3">
-          <div
-            style={{
-              width: width,
-              height: height,
-              cursor: selectedAction === "Add comment" ? "url('/icons/addCommentIcon.svg') 1 30, auto" : "auto",
-            }}
-            className={cn("relative flex justify-center items-center")}
-            ref={imageContainerRef}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={(e) => handleAddAnnotation(e)}
-            onMouseMove={(e) => handleGetNearestElems(e)}
-          >
-            {imageData && (
-              <SketchCanvas
-                image={imageData?.image_url}
-                handleSetMainAction={handleSetMainAction}
-                handleUpdatePath={handleUpdateImagePath}
-                canvasPath={canvasPaths}
-              />
-            )}
-            {selectedAction !== "Draw" && (
-              <PathOverlay
-                hideAllPaths={selectedAction === "Hide Paths" ? true : false}
-                paths={canvasPaths}
-                canvasWidth={width}
-                canvasHeight={height}
-                denormalize={({ x, y }) => ({
-                  x: x,
-                  y: y,
-                })}
-              />
-            )}
+    // <imageMetaDataCtx.Provider
+    //   value={{
+    //     curSelectedMetaDataId,
+    //     metaData,
+    //     setMetaData,
+    //     handleAddComment,
+    //     selectedAction,
+    //     setSelectedAction,
+    //     handleHideAllMetadata,
+    //     showAllMetadata,
+    //     handleDeSelectMetadata,
+    //   }}
+    // >
+    //   <div className="h-screen flex flex-row relative">
+    //     {/** Side bar - to show all comments : Desktop view */}
+    //     {(selectedAction === "All comments" || curSelectedMetaDataId) && (
+    //       <CommentSideBar
+    //         getTotalSubCommentCount={getTotalSubCommentCount}
+    //         onClickMetaData={handleClickMetaData}
+    //         ref={sideBarRef}
+    //       />
+    //     )}
 
-            {imageData && metaData.length > 0 && <MetaDataAnnotationLayer handleClickMetaData={handleClickMetaData} />}
+    //     {/** Image Container */}
+    //     <div className="flex flex-1 flex-col justify-center items-center gap-3">
+    //       <div
+    //         style={{
+    //           width: width,
+    //           height: height,
+    //           cursor: selectedAction === "Add comment" ? "url('/icons/addCommentIcon.svg') 1 30, auto" : "auto",
+    //         }}
+    //         className={cn("relative flex justify-center items-center")}
+    //         ref={imageContainerRef}
+    //         onDragOver={(e) => e.preventDefault()}
+    //         onClick={(e) => handleAddAnnotation(e)}
+    //         onMouseMove={(e) => handleGetNearestElems(e)}
+    //       >
 
-            {selectedAction === "Add comment" && offsetValue && (
-              <AddAnnotation offsetValues={offsetValue} handleAddMetadata={handleAddMetadata} />
-            )}
-          </div>
-        </div>
-        {selectedAction !== "Draw" && (
-          <div ref={actionRef} className="absolute bottom-0 left-1/2 -translate-2/4">
-            <ActionToolbar handleSelectedAction={handleSelectedAction} />
-          </div>
-        )}
-      </div>
-    </imageMetaDataCtx.Provider>
+    //         {/** sketch Canvas - for Drawing on image */}
+    //         {imageData && (
+    //           <SketchCanvas
+    //             image_url={imageData?.image_url}
+    //             handleSetMainAction={handleSetMainAction}
+    //             handleUpdatePath={handleUpdateImagePath}
+    //             canvasPath={canvasPaths}
+    //             inDrawMode={selectedAction === "Draw"}
+    //           />
+    //         )}
+
+    //         {/** Path Overlay - to show the paths drawn on image*/}
+    //         {selectedAction !== "Draw" && (
+    //           <PathOverlay
+    //             hideAllPaths={selectedAction === "Hide Paths" ? true : false}
+    //             paths={canvasPaths}
+    //             canvasWidth={width}
+    //             canvasHeight={height}
+    //             denormalize={({ x, y }) => ({
+    //               x: x,
+    //               y: y,
+    //             })}
+    //           />
+    //         )}
+
+    //         {/** Metadata layer - to map all the comments on image */}
+    //         {imageData && metaData.length > 0 && <MetaDataAnnotationLayer handleClickMetaData={handleClickMetaData} />}
+
+    //         {/** To add new Annotation - new comment on image */}
+    //         {selectedAction === "Add comment" && offsetValue && (
+    //           <AddAnnotation offsetValues={offsetValue} handleAddMetadata={handleAddMetadata} />
+    //         )}
+    //       </div>
+    //     </div>
+
+    //     {/** Action toolBar */}
+    //     {selectedAction !== "Draw" && (
+    //       <div ref={actionRef} className="absolute bottom-0 left-1/2 -translate-2/4">
+    //         <ActionToolbar handleSelectedAction={handleSelectedAction} />
+    //       </div>
+    //     )}
+
+    //     {/** Bottom Menu - Mobile View only */}
+    //     {openBottomMenu && (
+    //       <div className="block md:hidden w-full absolute bottom-0">
+    //         <BottomCommentMenu
+    //           isOpen={openBottomMenu}
+    //           handleCloseMenu={handleCloseBottomMenu}
+    //           handleAddMetadata={handleAddMetadata}
+    //           subComments={subComments}
+    //         />
+    //       </div>
+    //     )}
+    //   </div>
+    // </imageMetaDataCtx.Provider>
+
+    <Annotator
+      image_alt="image"
+      image_url={imageData?.image_url ?? ""}
+      // maxHeight={MAX_HEIGHT}
+      // maxWidth={MAX_WIDTH}
+      onDelete={(val) => console.log("delete triggered", val)}
+      onEdit={(val) => console.log("edit", val)}
+      currentUserId="Unknown"
+      drawingOptions={{
+        strokeColor: "blue",
+        strokeWidth: 10,
+      }}
+      actionToolbarStyle={{
+        backgroundColor: "red",
+      }}
+    />
   );
 };
 export default ImageDetailsPage;

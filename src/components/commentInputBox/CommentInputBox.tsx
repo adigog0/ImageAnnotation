@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDebounce } from "../../hooks/useDebounce";
 import SendIcon from "../../assets/icons/send.svg?react";
+import { cn } from "../../lib/tailwind";
 
 interface IProps {
   user_name?: string;
@@ -21,14 +22,14 @@ const CommentBox = ({ handleInputValue, input_placeholder, initial_value }: IPro
 
   function handleBlur() {
     handleInputValue(inputValue.trim());
-    setInputValue("")
+    setInputValue("");
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleInputValue(inputValue.trim());
-      setInputValue("")
+      setInputValue("");
     }
   }
 
@@ -37,11 +38,11 @@ const CommentBox = ({ handleInputValue, input_placeholder, initial_value }: IPro
   }
 
   return (
-    <div className="flex gap-2 items-center w-full z-10 ">
-      <div className="flex gap-2 items-center bg-gray-100 rounded-xl py-1 px-2">
+    <div className="flex gap-2 items-center w-full z-10">
+      <div className="flex gap-2 items-center bg-gray-100 rounded-xl py-1 px-2 w-full">
         <textarea
           autoFocus
-          className="rounded-xl p-1 resize-none outline-none "
+          className="rounded-xl p-1 resize-none outline-none w-full"
           rows={inputValue.trim() === "" ? 1 : 3}
           cols={40}
           placeholder={input_placeholder ?? "Add a comment"}
@@ -52,7 +53,10 @@ const CommentBox = ({ handleInputValue, input_placeholder, initial_value }: IPro
         ></textarea>
 
         <button
-          className="border border-transparent cursor-pointer hover:border-gray-400 bg-gray-300 p-[0.1rem] rounded-full h-fit"
+          className={cn(
+            "border border-transparent cursor-pointer hover:border-gray-400  p-[0.1rem] rounded-full h-fit",
+            inputValue.trim() === "" ? "bg-gray-300" : "bg-blue-400"
+          )}
           onClick={handleSendClick}
         >
           <SendIcon fill="white" className="size-5" />

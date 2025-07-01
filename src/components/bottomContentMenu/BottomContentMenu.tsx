@@ -1,88 +1,97 @@
 import { useState } from "react";
+import CloseIcon from "../../assets/icons/close.svg?react";
+import CommentListDisplay from "../commentListDisplay/CommentListDisplay";
+import type { MetaData } from "../../types/constant";
+import { cn } from "../../lib/tailwind";
+import { useAnnotatorContext } from "../../context/AnnotatorContext";
 
-interface IProps {
+interface BottomCommentMenuProps {
   isOpen: boolean;
   handleCloseMenu: () => void;
+  handleAddMetadata: (val: string, type: "new" | "sub") => void;
+  subComments: MetaData[];
+  allowCloseOnOverlayClick?: boolean;
+  doneButtonLabel?: string;
+  menuClassName?: string;
+  overlayClassName?: string;
+  renderCustomComments?: React.ReactNode;
 }
 
-const BottomCommentMenu = ({ isOpen, handleCloseMenu }: IProps) => {
+const BottomCommentMenu = ({
+  isOpen,
+  handleCloseMenu,
+  handleAddMetadata,
+  subComments,
+  allowCloseOnOverlayClick = true,
+  doneButtonLabel = "Done",
+  menuClassName,
+  overlayClassName,
+  renderCustomComments,
+}: BottomCommentMenuProps) => {
+  //states
   const [comment, setComment] = useState("");
+
+  //context
+  const { curSelectedMetaDataId } = useAnnotatorContext();
+
+  //methods
+  function handleAddComment() {
+    if (!comment.trim()) return;
+    handleAddMetadata(comment.trim(), "new");
+    setComment("");
+    handleCloseMenu();
+  }
 
   return (
     <>
-      {/* <button onClick={() => setOpen(true)} style={{ position: "fixed", bottom: 20, left: 20, zIndex: 1000 }}>
-        Open Comment
-      </button> */}
-
-      {/* Overlay */}
       {isOpen && (
         <div
-          onClick={handleCloseMenu}
-          className="fixed bottom-0 z-[1000] bg-amber-50"
-          // style={{
-          //   position: "fixed",
-          //   top: 0,
-          //   left: 0,
-          //   right: 0,
-          //   bottom: 0,
-          //   backgroundColor: "rgba(0,0,0,0.3)",
-          //   zIndex: 999,
-          // }}
+          className={cn("fixed top-0 left-0 right-0 bottom-0 z-[1000] bg-[rgba(0,0,0,0.3)]", overlayClassName)}
+          onClick={() => allowCloseOnOverlayClick && handleCloseMenu()}
         />
       )}
 
       <div
-        style={{
-          position: "fixed",
-          bottom: isOpen ? 0 : "-50vh",
-          left: 0,
-          right: 0,
-          height: "50vh",
-          backgroundColor: "white",
-          boxShadow: "0 -2px 10px rgba(0,0,0,0.3)",
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
-          padding: 20,
-          transition: "bottom 0.3s ease-in-out",
-          zIndex: 1000,
-          display: "flex",
-          flexDirection: "column",
-        }}
+        className={cn(
+          "fixed left-0 right-0 p-4 bg-white shadow-lg rounded-t-xl z-[1001] transition-all duration-300",
+          menuClassName
+        )}
+        style={{ bottom: isOpen ? 0 : "-50vh" }}
       >
-        <div style={{ marginBottom: 12, fontWeight: "bold", fontSize: 18 }}>Write a comment</div>
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Type your comment here..."
-          style={{
-            flexGrow: 1,
-            resize: "none",
-            padding: 10,
-            fontSize: 16,
-            borderRadius: 8,
-            border: "1px solid #ccc",
-            outline: "none",
-          }}
-        />
-        <button
-          onClick={() => {
-            setComment("");
-            handleCloseMenu();
-          }}
-          style={{
-            marginTop: 12,
-            padding: "10px 20px",
-            fontSize: 16,
-            backgroundColor: "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-          }}
-          disabled={!comment.trim()}
-        >
-          Submit
-        </button>
+        {/* Header */}
+        <div className="mb-2 flex justify-between items-center font-semibold text-lg">
+          <span>{subComments.length > 0 ? "Comments" : "Add a comment"}</span>
+          <button onClick={handleCloseMenu} className="hover:bg-gray-200 rounded-md p-1">
+            <CloseIcon fill="gray" className="size-4" />
+          </button>
+        </div>
+
+        {/* Render external comment list if passed */}
+        {renderCustomComments ? (
+          renderCustomComments
+        ) : curSelectedMetaDataId ? (
+          <CommentListDisplay comments={subComments} />
+        ) : (
+          <>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Type your comment here..."
+              className="w-full resize-none p-2 text-base border rounded-lg border-gray-300 outline-none"
+              rows={3}
+            />
+            <button
+              onClick={handleAddComment}
+              disabled={comment.trim() === ""}
+              className={cn(
+                "mt-3 w-full py-2 px-4 rounded-lg text-white",
+                comment.trim() === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+              )}
+            >
+              {doneButtonLabel}
+            </button>
+          </>
+        )}
       </div>
     </>
   );

@@ -1,66 +1,60 @@
 import { format } from "date-fns";
 import OptionIcon from "../../assets/icons/optionsDot.svg?react";
 import { cn } from "../../lib/tailwind";
-import type { MetaData } from "../../pages/ImageDetailsPage";
 import CustomMenu from "../customMenu/CustomMenu";
-import { useState } from "react";
+import { memo, useState } from "react";
+import type { MetaData } from "../../types/constant";
+import { useAnnotatorContext } from "../../context/AnnotatorContext";
 
-const parentCommentOptions = ["Hide comment", "Delete"] as const;
-const commentOptions = ["Edit", "Delete"] as const;
-
-type CommentOption = (typeof commentOptions)[number];
-type CommentHandlerMap = {
-  [key in CommentOption]: (...args: any[]) => void;
+export type CommentOption = "Edit" | "Delete" | "Hide comments";
+export type CommentHandlerMap = {
+  [key in CommentOption]?: (id: string) => void;
 };
 
 interface CommentCardProps {
   comment: MetaData;
   type: "fromList" | "fromTag";
   curSelectedMetaDataId: string;
-  handleClickMetaData?: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
+  onClickMetaData?: (e: React.MouseEvent<HTMLDivElement>, id: string) => void;
   getTotalSubCommentCount?: (id: string) => number;
-  handleDeleteMetaDataById: (id: string) => void;
-  handleEditComment: (id: string) => void;
+  commentOptionMenuStyle?: React.CSSProperties;
+  commentCardStyle?: React.CSSProperties;
+  optionLabels?: Partial<Record<CommentOption, React.ReactNode>>; // for custom text/icons
 }
 
 const CommentCard = ({
   comment,
   curSelectedMetaDataId,
-  handleClickMetaData,
+  onClickMetaData,
   getTotalSubCommentCount,
-  handleEditComment,
-  handleDeleteMetaDataById,
+  commentOptionMenuStyle,
+  commentCardStyle,
+  optionLabels,
   type,
 }: CommentCardProps) => {
-  const { metadata_id, created_by, created_at, metadata_value } = comment;
-
-  //states
+  //state
   const [menuAnchor, setMenuAnchor] = useState<HTMLButtonElement | null>(null);
 
-  //const
-  const CommentOptionsHandlerMap: CommentHandlerMap = {
-    Edit: handleEditComment,
-    Delete: handleDeleteMetaDataById,
+  //context
+  const { hideAllMetadata, handleDeleteMetaData, onEdit } = useAnnotatorContext();
+
+  //consts
+  const { metadata_id, created_by, created_at, metadata_value } = comment;
+  const isParentComment = comment.parent_id === null;
+  const commentOptions: CommentOption[] = isParentComment ? ["Hide comments", "Delete"] : ["Edit", "Delete"];
+  const optionsHandlerMap: CommentHandlerMap = {
+    "Hide comments": hideAllMetadata,
+    Delete: handleDeleteMetaData,
+    Edit: onEdit,
   };
 
-  //methods
-
-  function handleOpenOptionMenu(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
+  //handlers
+  function handleOpenOptionMenu(e: React.MouseEvent<HTMLButtonElement>) {
     setMenuAnchor(e.currentTarget);
   }
 
   function handleCloseOptionMenu() {
     setMenuAnchor(null);
-  }
-
-  function handleGenerateCommentOptions() {
-    if (menuAnchor && menuAnchor.id.startsWith("parent_comment_options")) {
-      return parentCommentOptions;
-    } else return commentOptions;
-  }
-
-  function getlistHandler(e: React.MouseEvent<HTMLSpanElement, MouseEvent>) {
-    return CommentOptionsHandlerMap[e.currentTarget.id as keyof typeof CommentOptionsHandlerMap]();
   }
 
   return (
@@ -70,7 +64,8 @@ const CommentCard = ({
           "p-2 rounded-md cursor-pointer",
           metadata_id === curSelectedMetaDataId && type === "fromList" ? "bg-blue-100" : "bg-white"
         )}
-        onClick={(e) => handleClickMetaData && handleClickMetaData(e, metadata_id)}
+        onClick={(e) => onClickMetaData?.(e, metadata_id)}
+        style={commentCardStyle}
       >
         <div className="flex gap-2.5">
           <div className="bg-blue-400 text-white p-1 px-2.5 h-fit capitalize rounded-full">{created_by[0]}</div>
@@ -81,7 +76,6 @@ const CommentCard = ({
               <span className="text-[0.6rem] text-gray-400">{format(created_at, "dd MMMM yyyy")}</span>
               <button
                 id={metadata_id}
-                name="sub_comment_options"
                 className="ml-auto hover:bg-gray-200 rounded-md relative"
                 onClick={handleOpenOptionMenu}
               >
@@ -98,22 +92,28 @@ const CommentCard = ({
           </span>
         )}
       </div>
-      <CustomMenu handleClose={handleCloseOptionMenu} buttonRef={menuAnchor}>
-        <div className="flex flex-col ">
-          {handleGenerateCommentOptions().map((c) => (
-            <span
-              key={c}
-              id={c}
-              className="text-xs hover:bg-gray-200 py-1 px-5 w-full"
-              onClick={(e) => getlistHandler(e)}
-            >
-              {c}
-            </span>
-          ))}
-        </div>
-      </CustomMenu>
+
+      {/* Option Menu */}
+      {menuAnchor && (
+        <CustomMenu handleClose={handleCloseOptionMenu} buttonRef={menuAnchor}>
+          <div className={cn("flex flex-col")} style={commentOptionMenuStyle}>
+            {commentOptions.map((option) => (
+              <span
+                key={option}
+                className="text-xs hover:bg-gray-200 py-1 px-5 w-full"
+                onClick={() => {
+                  optionsHandlerMap[option]?.(metadata_id);
+                  handleCloseOptionMenu();
+                }}
+              >
+                {optionLabels?.[option] ?? option}
+              </span>
+            ))}
+          </div>
+        </CustomMenu>
+      )}
     </>
   );
 };
 
-export default CommentCard;
+export default memo(CommentCard);

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 export function useResponsiveCanvasSize(imageUrl: string, maxWidth: number, maxHeight: number) {
-
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -16,7 +15,7 @@ export function useResponsiveCanvasSize(imageUrl: string, maxWidth: number, maxH
         // Get current viewport size
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
-
+        console.log(screenHeight, maxHeight);
         // Limit canvas max width & height (like 70rem = 1120px, 45rem = 720px)
         const limitWidth = Math.min(screenWidth, maxWidth);
         const limitHeight = Math.min(screenHeight, maxHeight);
@@ -29,7 +28,8 @@ export function useResponsiveCanvasSize(imageUrl: string, maxWidth: number, maxH
           height = limitHeight;
           width = height * aspectRatio;
         }
-
+        console.log("aspect ratio", aspectRatio);
+        console.log("height", height);
         setSize({ width, height });
       };
     };

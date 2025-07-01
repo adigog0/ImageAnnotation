@@ -1,271 +1,354 @@
 import { useEffect, useRef, useState } from "react";
-import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from "react-sketch-canvas";
+import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath, type Point } from "react-sketch-canvas";
+import { cn } from "../../lib/tailwind";
 import RedoIcon from "../../assets/icons/redo.svg?react";
 import UndoIcon from "../../assets/icons/undo.svg?react";
 import CancelIcon from "../../assets/icons/cancel.svg?react";
-import Tooltip from "../tooltip/Tooltip";
-import { cn } from "../../lib/tailwind";
 import DoneIcon from "../../assets/icons/done.svg?react";
 import Stroke1 from "../../assets/icons/stroke1.svg?react";
 import Stroke2 from "../../assets/icons/stroke2.svg?react";
 import Stroke3 from "../../assets/icons/stroke3.svg?react";
 import Stroke4 from "../../assets/icons/stroke4.svg?react";
 import EraseIcon from "../../assets/icons/Eraser.svg?react";
-import ColorPicker from "../../assets/icons/colorPicker.svg?react";
-import type { ActionTypes } from "../actionToolBar/ActionToolbar";
-import { useMetaDataCtx } from "../../pages/ImageDetailsPage";
+import ColorPickerButton from "../colorPickerButton/ColorPickerButton";
 
-type SketchActions = "Redo" | "Undo" | "Cancel" | "Done";
-type sketchOptions = "Erase" | "Pen" | "pick color";
+export type SketchActions = "Redo" | "Undo" | "Cancel" | "Done";
+export type SketchOptions = "Erase" | "Pen" | "pick color";
 
-const sketchActions = [
-  { label: "Cancel", icon: <CancelIcon fill="grey" className="cursor-pointer" /> },
-  { label: "Redo", icon: <RedoIcon fill="grey" className="cursor-pointer" /> },
-  { label: "Undo", icon: <UndoIcon fill="grey" className="cursor-pointer" /> },
-  { label: "Done", icon: <DoneIcon fill="grey" className="cursor-pointer" /> },
-];
-
-interface StrokeWidthProps {
-  handleDrawOptions: (type: sketchOptions, value?: number | string) => void;
-  selectedWidth: number;
-  sketchOptions: sketchOptions | null;
-}
-
-const StrokeWidthComponent: React.FC<StrokeWidthProps> = ({ handleDrawOptions, selectedWidth, sketchOptions }) => {
-  const preConfiguredStrokes = [
-    { value: 2, icon: <Stroke1 fill="black" className=" cursor-pointer size-6" /> },
-    { value: 5, icon: <Stroke2 fill="black" className=" cursor-pointer size-6" /> },
-    { value: 10, icon: <Stroke3 fill="black" className=" cursor-pointer size-6" /> },
-    { value: 15, icon: <Stroke4 fill="black" className=" cursor-pointer size-6" /> },
-  ];
-
-  return (
-    <div className="flex gap-2">
-      {preConfiguredStrokes.map((s, i) => (
-        <Tooltip key={i} title={`stroke width - ${String(s.value)}`}>
-          <button
-            className={cn(
-              "rounded-xl p-1 outline outline-transparent hover:outline hover:outline-gray-500",
-              sketchOptions === "Pen" && selectedWidth === s.value ? "bg-blue-300" : "bg-gray-200 "
-            )}
-            onClick={() => handleDrawOptions("Pen", s.value)}
-          >
-            {s.icon}
-          </button>
-        </Tooltip>
-      ))}
-    </div>
-  );
-};
-
-interface ColorPickerProps {
-  strokeColor: string;
-  handleDrawOptions: (type: sketchOptions, value?: number | string) => void;
-}
-
-const StrokeColorComponent: React.FC<ColorPickerProps> = ({ handleDrawOptions, strokeColor }) => {
-  return (
-    <Tooltip title="Pick color">
-      <input
-        type="color"
-        style={{}}
-        className="w-8 rounded-lg cursor-pointer outline outline-transparent hover:outline hover:outline-gray-500"
-        id="strokeColorPicker"
-        value={strokeColor}
-        onChange={(e) => handleDrawOptions("pick color", e.target.value)}
-      />
-    </Tooltip>
-  );
-};
-
-interface IProps {
-  image: string;
-  handleSetMainAction: () => void;
+interface SketchCanvasProps {
+  image_url: string;
+  canvasPath?: CanvasPath[] | null;
   handleUpdatePath: (path: CanvasPath[]) => void;
-  canvasPath: CanvasPath[] | null;
+  handleSetMainAction: () => void;
+  drawingOptions?: {
+    strokeColor?: string;
+    strokeWidth?: number;
+  };
+  inDrawMode: boolean;
+  sketchCanvasStyle?: React.CSSProperties;
+  onDrawStart?: () => void;
+  onDrawEnd?: () => void;
+  toolbarOptions?: {
+    topToolbarIcons?: Partial<Record<SketchActions, React.ReactNode>>;
+    strokeIcons?: {
+      colorPickerIcon?: React.ReactNode;
+      eraserIcon?: React.ReactNode;
+      strokeWidthIcons?: Record<number, React.ReactNode>;
+    };
+    topToolbarStyle?: React.CSSProperties;
+    bottomToolbarStyle?: React.CSSProperties;
+  };
 }
-const SketchCanvas = ({ image, handleSetMainAction, handleUpdatePath, canvasPath }: IProps) => {
-  //state
+
+const SketchCanvas = ({
+  image_url,
+  handleUpdatePath,
+  handleSetMainAction,
+  canvasPath,
+  drawingOptions,
+  inDrawMode,
+  sketchCanvasStyle,
+  onDrawStart,
+  onDrawEnd,
+  toolbarOptions,
+}: SketchCanvasProps) => {
+  //states
   const [isDrawing, setIsDrawing] = useState(false);
-  const [strokeWidth, setStrokeWidth] = useState<number>(5);
-  const [strokeColor, setStrokeColor] = useState("#000000");
-  const [sketchOptions, setSketchOptions] = useState<sketchOptions | null>("Pen");
+  const [strokeWidth, setStrokeWidth] = useState(drawingOptions?.strokeWidth ?? 5);
+  const [strokeColor, setStrokeColor] = useState(drawingOptions?.strokeColor ?? "#000000");
+  const [sketchOptions, setSketchOptions] = useState<SketchOptions | null>("Pen");
+  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
 
   //hooks
   const canvasRef = useRef<ReactSketchCanvasRef>(null);
-  const { selectedAction } = useMetaDataCtx();
+
+  //consts
+  const defaultStrokeIcons: Record<number, React.ReactNode> = {
+    2: <Stroke1 className="size-6 cursor-pointer fill-amber-50" />,
+    5: <Stroke2 className="size-6 cursor-pointer fill-amber-50" />,
+    10: <Stroke3 className="size-6 cursor-pointer fill-amber-50" />,
+    15: <Stroke4 className="size-6 cursor-pointer fill-amber-50" />,
+  };
+
+  const sketchActions: { label: SketchActions; icon: React.ReactNode }[] = [
+    { label: "Cancel", icon: toolbarOptions?.topToolbarIcons?.Cancel ?? <CancelIcon fill="white" /> },
+    { label: "Redo", icon: toolbarOptions?.topToolbarIcons?.Redo ?? <RedoIcon fill="white" /> },
+    { label: "Undo", icon: toolbarOptions?.topToolbarIcons?.Undo ?? <UndoIcon fill="white" /> },
+    { label: "Done", icon: toolbarOptions?.topToolbarIcons?.Done ?? <DoneIcon fill="white" /> },
+  ];
 
   //methods
-  function handleSelectedAction(actionType: SketchActions) {
-    switch (actionType) {
+  function getStrokeLength(points: Point[]): number {
+    let length = 0;
+    for (let i = 1; i < points.length; i++) {
+      const dx = points[i].x - points[i - 1].x;
+      const dy = points[i].y - points[i - 1].y;
+      length += Math.sqrt(dx * dx + dy * dy);
+    }
+    return length;
+  }
+
+  /**
+   * Bounding box intersection check
+   * Checks if two paths intersect — but it does so approximately, by comparing their bounding rectangles instead of   their actual curves. (a quick heuristic)
+   * @param path1 - Array of points
+   * @param path2 - Array of points
+   * @returns boolean
+   */
+  function isPathIntersecting(path1: Point[], path2: Point[]): boolean {
+    const getBounds = (pts: Point[]) => {
+      const xs = pts.map((p) => p.x);
+      const ys = pts.map((p) => p.y);
+      return {
+        xMin: Math.min(...xs),
+        xMax: Math.max(...xs),
+        yMin: Math.min(...ys),
+        yMax: Math.max(...ys),
+      };
+    };
+
+    const b1 = getBounds(path1);
+    const b2 = getBounds(path2);
+
+    //standard 2D Axis-Aligned Bounding Box (AABB)
+    return b1.xMin < b2.xMax && b1.xMax > b2.xMin && b1.yMin < b2.yMax && b1.yMax > b2.yMin;
+  }
+
+  function handleDrawOptions(type: SketchOptions, value?: number | string) {
+    switch (type) {
+      case "Erase":
+        setSketchOptions("Erase");
+        canvasRef.current?.eraseMode(true);
+        break;
+      case "Pen":
+        setSketchOptions("Pen");
+        canvasRef.current?.eraseMode(false);
+        setStrokeWidth(value as number);
+        break;
+      case "pick color":
+        setStrokeColor(value as string);
+        break;
+    }
+  }
+
+  function handleSelectedAction(action: SketchActions) {
+    switch (action) {
       case "Done":
-        handleExportPath();
+        exportPaths();
+        if (sketchOptions === "Erase") {
+          setSketchOptions("Pen");
+          canvasRef.current?.eraseMode(false);
+        }
         break;
       case "Cancel":
         handleSetMainAction();
         break;
-      case "Redo":
-        canvasRef.current?.redo();
-        break;
       case "Undo":
         canvasRef.current?.undo();
+        break;
+      case "Redo":
+        canvasRef.current?.redo();
         break;
     }
   }
 
-  const handleExportPath = async () => {
+  const exportPaths = async () => {
     if (canvasRef.current) {
-      try {
-        const paths = await canvasRef.current.exportPaths();
-        handleUpdatePath(paths);
-        console.log("Exported Paths:", paths);
-        // You can now save it or send to backend
-      } catch (error) {
-        console.error("Export failed:", error);
-      }
+      const paths = await canvasRef.current.exportPaths();
+      handleUpdatePath(paths);
     }
     handleSetMainAction();
   };
 
-  function handleDrawOptions(type: sketchOptions, value?: number | string) {
-    switch (type) {
-      case "Erase":
-        handleErase();
-        break;
-      case "Pen":
-        handleStrokeWidthChange(value as number);
-        break;
-      case "pick color":
-        handleStrokeColor(value as string);
-        break;
-      default:
-        break;
+  // If the stroke is long enough, it checks for path intersections and deletes intersected paths.
+  const handleStrokeEnd = async (newStroke: Point[]) => {
+    const STROKE_THRESHOLD = 10;
+    if (!canvasPath || !newStroke?.length) return;
+
+    const length = getStrokeLength(newStroke);
+    if (length < STROKE_THRESHOLD) return;
+
+    const updatedPaths = canvasPath.filter((existingPath) => !isPathIntersecting(existingPath.paths, newStroke));
+    if (updatedPaths.length !== canvasPath.length) {
+      handleUpdatePath(updatedPaths);
+      canvasRef.current?.clearCanvas();
+      canvasRef.current?.loadPaths(updatedPaths);
     }
-  }
+  };
 
-  function handleStrokeWidthChange(width: number) {
-    setSketchOptions("Pen");
-    canvasRef.current?.eraseMode(false);
-    setStrokeWidth(width);
-  }
+  //Called on a pointer click. It checks if the click is near any path and deletes those.
+  const handlePathPointerUp = (e: PointerEvent) => {
+    if (sketchOptions !== "Erase" || !canvasPath?.length) return;
 
-  function handleErase() {
-    setSketchOptions("Erase");
-    canvasRef.current?.eraseMode(true);
-  }
+    const svg = document.getElementById("current_image") as SVGSVGElement | null;
+    if (!svg) return;
 
-  function handleStrokeColor(color: string) {
-    setStrokeColor(color);
-  }
+    const point = {
+      x: e.clientX - svg.getBoundingClientRect().left,
+      y: e.clientY - svg.getBoundingClientRect().top,
+    };
+
+    const updatedPaths = canvasPath.filter((p) => !isPathIntersecting(p.paths, [point, point]));
+
+    if (updatedPaths.length !== canvasPath.length) {
+      handleUpdatePath(updatedPaths);
+      canvasRef.current?.clearCanvas();
+      canvasRef.current?.loadPaths(updatedPaths);
+    }
+  };
 
   useEffect(() => {
-    if (canvasPath && canvasPath.length && canvasRef.current && selectedAction === "Draw") {
+    const svg = document.getElementById("current_image") as SVGSVGElement | null;
+    if (!svg) return;
+
+    const handleStartDraw = () => {
+      setIsDrawing(true);
+      onDrawStart?.();
+    };
+
+    const handleEndDraw = () => {
+      setIsDrawing(false);
+      onDrawEnd?.();
+    };
+
+    const addListeners = () => {
+      svg.addEventListener("pointerdown", handleStartDraw);
+      svg.addEventListener("pointerup", handleEndDraw);
+      svg.querySelectorAll("path").forEach((path) => path.addEventListener("pointerup", handlePathPointerUp));
+    };
+
+    const removeListeners = () => {
+      svg.removeEventListener("pointerdown", handleStartDraw);
+      svg.removeEventListener("pointerup", handleEndDraw);
+      svg.querySelectorAll("path").forEach((path) => path.removeEventListener("pointerup", handlePathPointerUp));
+    };
+
+    addListeners();
+    const observer = new MutationObserver(() => {
+      removeListeners();
+      addListeners();
+    });
+
+    observer.observe(svg, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      removeListeners();
+    };
+  }, [canvasPath, sketchOptions]);
+
+  useEffect(() => {
+    if (canvasPath && canvasPath.length && canvasRef.current && inDrawMode) {
       canvasRef.current.loadPaths(canvasPath);
     } else {
       canvasRef.current?.clearCanvas();
     }
-  }, [canvasPath, selectedAction]);
+  }, [canvasPath, inDrawMode]);
 
   useEffect(() => {
-    const svg = document.getElementById("current_image") as SVGSVGElement | null;
+    const canvas = document.getElementById("current_image");
+    if (!canvas) return;
 
-    if (!svg) return;
-
-    const addListeners = () => {
-      const paths = svg.querySelectorAll("path");
-      svg.addEventListener("pointerdown", handleStartDraw);
-      svg.addEventListener("touchstart", handleStartDraw);
-      svg.addEventListener("touchend", handleEndDraw);
-      paths.forEach((path) => {
-        path.addEventListener("pointerup", handleEndDraw);
-      });
+    const handlePointerMove = (e: PointerEvent) => {
+      if (sketchOptions === "Erase") {
+        setPointerPos({ x: e.clientX, y: e.clientY });
+      } else {
+        setPointerPos(null);
+      }
     };
 
-    const handleStartDraw = () => setIsDrawing(true);
-    const handleEndDraw = () => setIsDrawing(false);
-
-    // Initial run
-    addListeners();
-
-    // Watch for new paths being added
-    const observer = new MutationObserver(() => {
-      addListeners();
-    });
-
-    observer.observe(svg, {
-      childList: true,
-      subtree: true,
-    });
-
+    canvas.addEventListener("pointermove", handlePointerMove);
     return () => {
-      observer.disconnect();
-      svg.removeEventListener("pointerdown", handleStartDraw);
-      svg.addEventListener("touchstart", handleStartDraw);
-      svg.addEventListener("touchend", handleEndDraw);
-      svg.querySelectorAll("path").forEach((path) => {
-        path.removeEventListener("pointerup", handleEndDraw);
-      });
+      canvas.removeEventListener("pointermove", handlePointerMove);
     };
-  }, []);
+  }, [sketchOptions]);
 
   return (
     <>
       <ReactSketchCanvas
         id="current_image"
+        className={cn("rounded-md", sketchOptions === "Erase" && "cursor-none")}
+        style={sketchCanvasStyle}
         width="100%"
         height="100%"
-        allowOnlyPointerType={selectedAction === "Draw" ? "all" : "Pen"}
+        allowOnlyPointerType={inDrawMode ? "all" : "Pen"}
         preserveBackgroundImageAspectRatio="xMidyMid"
         ref={canvasRef}
-        backgroundImage={image}
+        backgroundImage={image_url}
         strokeColor={strokeColor}
         strokeWidth={strokeWidth}
+        onStroke={(path, isEraser) => {
+          if (isEraser) {
+            handleStrokeEnd(path.paths);
+          }
+        }}
       />
-      {selectedAction === "Draw" && (
+
+      {inDrawMode && (
         <>
           <div
             className={cn(
-              "absolute bottom-0 md:-bottom-16 left-1/2 -translate-x-1/2 flex gap-2 transition-all duration-300 ease-in-out",
-              isDrawing ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
+              "absolute -bottom-10 left-1/2 -translate-x-1/2 flex gap-2",
+              isDrawing ? "opacity-0 pointer-events-none" : "opacity-100"
             )}
+            style={toolbarOptions?.bottomToolbarStyle}
           >
-            <StrokeColorComponent handleDrawOptions={handleDrawOptions} strokeColor={strokeColor} />
-            <Tooltip title="Erase">
+            <ColorPickerButton onChange={(val) => handleDrawOptions("pick color", val)} strokeColor={strokeColor} />
+
+            <button
+              onClick={() => handleDrawOptions("Erase")}
+              className={cn(
+                "p-1 rounded-xl cursor-pointer border border-transparent hover:border-gray-400",
+                sketchOptions === "Erase" ? "bg-blue-300" : "bg-gray-700"
+              )}
+            >
+              {toolbarOptions?.strokeIcons?.eraserIcon ?? (
+                <EraseIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />
+              )}
+            </button>
+            {Object.entries(toolbarOptions?.strokeIcons?.strokeWidthIcons ?? defaultStrokeIcons).map(([w, icon]) => (
               <button
+                key={w}
                 className={cn(
-                  "bg-gray-200 rounded-xl p-1 cursor-pointer outline outline-transparent hover:outline hover:outline-gray-500",
-                  sketchOptions === "Erase" ? "bg-blue-300" : "bg-gray-200"
+                  "rounded-xl p-1 cursor-pointer border border-transparent hover:border-gray-400",
+                  sketchOptions === "Pen" && strokeWidth === Number(w) ? "bg-blue-300" : "bg-gray-700"
                 )}
-                onClick={() => handleDrawOptions("Erase")}
+                onClick={() => handleDrawOptions("Pen", Number(w))}
               >
-                <EraseIcon fill="black" />
+                {icon}
               </button>
-            </Tooltip>
-            <StrokeWidthComponent
-              handleDrawOptions={handleDrawOptions}
-              selectedWidth={strokeWidth}
-              sketchOptions={sketchOptions}
-            />
+            ))}
           </div>
+
           <div
             className={cn(
-              "p-1 absolute top-0 md:-top-12 flex gap-2 transition-all duration-300 ease-in-out",
-              isDrawing ? "opacity-0 -translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
+              "absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2",
+              isDrawing ? "opacity-0 pointer-events-none" : "opacity-100"
             )}
+            style={toolbarOptions?.bottomToolbarStyle}
           >
-            {sketchActions.map((a, i) => (
-              <Tooltip title={a.label} key={i}>
-                <button
-                  id={a.label}
-                  className={cn("bg-white border border-gray-400 p-1 rounded-xl hover:bg-blue-100 ")}
-                  onClick={() => handleSelectedAction(a.label as SketchActions)}
-                >
-                  {a.icon}
-                </button>
-              </Tooltip>
+            {sketchActions.map(({ label, icon }) => (
+              <button
+                key={label}
+                onClick={() => handleSelectedAction(label)}
+                className="bg-gray-700 p-1 rounded-xl cursor-pointer border border-transparent hover:border-gray-400"
+              >
+                {icon}
+              </button>
             ))}
           </div>
         </>
+      )}
+
+      {sketchOptions === "Erase" && pointerPos && (
+        <EraseIcon
+          className="fixed z-50 pointer-events-none text-white drop-shadow-xl"
+          style={{
+            width: `${strokeWidth * 2}px`,
+            height: `${strokeWidth * 2}px`,
+            left: pointerPos.x - strokeWidth,
+            top: pointerPos.y - strokeWidth,
+          }}
+        />
       )}
     </>
   );

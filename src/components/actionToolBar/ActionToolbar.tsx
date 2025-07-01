@@ -10,6 +10,7 @@ import VisibilityOnIcon from "../../assets/icons/visibility_on.svg?react";
 import HidePathsIcon from "../../assets/icons/noDraw.svg?react";
 import ViewAllCommentsIcon from "../../assets/icons/viewAll.svg?react";
 import { useMetaDataCtx } from "../../pages/ImageDetailsPage";
+import { useAnnotatorContext } from "../../context/AnnotatorContext";
 
 export type ActionTypes =
   | "Add comment"
@@ -22,49 +23,68 @@ export type ActionTypes =
 
 interface ActionToolbarProps {
   handleSelectedAction: (actionType: ActionTypes) => void;
+  className?: string;
+  actionIcons?: Partial<Record<ActionTypes, React.ReactNode>>;
 }
 
-const ActionToolbar: React.FC<ActionToolbarProps> = ({ handleSelectedAction }) => {
-  const { selectedAction } = useMetaDataCtx();
-  //const
-  const ActionArr = [
-    { label: "All comments", icon: <ViewAllCommentsIcon fill="grey" className="cursor-pointer" /> },
-    { label: "Add comment", icon: <CommentIcon fill="grey" className="cursor-pointer" /> },
-    { label: "Nearest tags", icon: <NearestTagIcon fill="grey" className="cursor-pointer" /> },
-    {
-      label: "Hide comments",
-      icon:
-        selectedAction === null || selectedAction !== "Hide comments" ? (
-          <VisibilityOnIcon fill="grey" className="cursor-pointer" />
+const ActionToolbar: React.FC<ActionToolbarProps> = ({ handleSelectedAction, className, actionIcons = {} }) => {
+  const { selectedAction, enableDrawing } = useAnnotatorContext();
+
+  //consts
+  const getIcon = (label: ActionTypes) => {
+    // If user passed a custom icon, use it
+    if (actionIcons[label]) return actionIcons[label];
+
+    // Else return default icon
+    switch (label) {
+      case "Add comment":
+        return <CommentIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />;
+      case "Nearest tags":
+        return <NearestTagIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />;
+      case "Hide comments":
+        return selectedAction === "Hide comments" ? (
+          <VisibilityOffIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />
         ) : (
-          <VisibilityOffIcon fill="grey" className="cursor-pointer" />
-        ),
-    },
-    { label: "Draw", icon: <DrawIcon fill="grey" className="cursor-pointer" /> },
-    { label: "Hide Paths", icon: <HidePathsIcon fill="grey" className="cursor-pointer" /> },
-    { label: "Save comments", icon: <SaveIcon fill="grey" className="cursor-pointer" /> },
+          <VisibilityOnIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />
+        );
+      case "Draw":
+        return <DrawIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />;
+      case "Save comments":
+        return <SaveIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />;
+      case "Hide Paths":
+        return <HidePathsIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />;
+      case "All comments":
+        return <ViewAllCommentsIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />;
+      default:
+        return null;
+    }
+  };
+
+  const ActionArr: ActionTypes[] = [
+    "All comments",
+    "Add comment",
+    "Nearest tags",
+    "Hide comments",
+    ...(enableDrawing ? (["Draw"] as ActionTypes[]) : []),
+    "Hide Paths",
+    "Save comments",
   ];
 
-  //methods
-  function handleClick(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
-    handleSelectedAction(e.currentTarget.id as ActionTypes);
-  }
-
   return (
-    <div className="flex gap-2">
-      {ActionArr.map((a, i) => (
-        <Tooltip title={a.label} key={i}>
+    <div className={cn("flex gap-2", className)}>
+      {ActionArr.map((label, i) => (
+        <Tooltip title={label} key={i}>
           <button
-            id={a.label}
+            id={label}
             className={cn(
-              "bg-white border border-gray-400 p-1.5 rounded-xl hover:bg-blue-100 ",
-              selectedAction && selectedAction !== "Save comments" && selectedAction === a.label
-                ? "bg-blue-200"
-                : "bg-white"
+              "bg-gray-700 border border-gray-400 p-1 rounded-xl hover:bg-blue-100 hover:text-gray-800",
+              selectedAction && selectedAction !== "Save comments" && selectedAction === label
+                ? "bg-blue-300"
+                : "bg-gray-700"
             )}
-            onClick={(e) => handleClick(e)}
+            onClick={() => handleSelectedAction(label)}
           >
-            {a.icon}
+            {getIcon(label)}
           </button>
         </Tooltip>
       ))}

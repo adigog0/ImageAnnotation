@@ -7,33 +7,53 @@ type CustomMenuProps = {
 };
 
 const CustomMenu = ({ buttonRef, handleClose, children }: CustomMenuProps) => {
-  //state
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
-
-  //hook
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (buttonRef) {
-      const parent = buttonRef?.offsetParent as HTMLElement; // The closest relative-positioned ancestor
+  const calculatePosition = () => {
+    if (buttonRef && menuContainerRef.current) {
+      const parent = buttonRef.offsetParent as HTMLElement;
       const rect = buttonRef.getBoundingClientRect();
       const parentRect = parent?.getBoundingClientRect();
+      const menuRect = menuContainerRef.current.getBoundingClientRect();
 
-      setPosition({
-        top: rect.bottom - parentRect?.top + 4, // relative to parent top
-        left: rect.left - parentRect?.left, // relative to parent left
-      });
+      let top = rect.bottom - parentRect.top + 4;
+      let left = rect.left - parentRect.left;
+
+      // Clamp to right edge
+      if (left + menuRect.width > window.innerWidth) {
+        left = window.innerWidth - menuRect.width - parentRect.left - 8;
+      }
+
+      // Clamp to bottom edge
+      if (top + menuRect.height > window.innerHeight) {
+        top = rect.top - parentRect.top - menuRect.height - 4;
+      }
+
+      // Minimum clamp
+      left = Math.max(left, 8);
+      top = Math.max(top, 8);
+
+      setPosition({ top, left });
     }
+  };
+
+  useEffect(() => {
+    calculatePosition();
+    window.addEventListener("resize", calculatePosition);
+    return () => window.removeEventListener("resize", calculatePosition);
   }, [buttonRef]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      console.log(e.currentTarget)
       if (
         buttonRef &&
         !buttonRef.contains(e.target as Node) &&
         menuContainerRef.current &&
         !menuContainerRef.current.contains(e.target as Node)
       ) {
+        console.log("clicked outside")
         handleClose();
       }
     };
@@ -42,16 +62,14 @@ const CustomMenu = ({ buttonRef, handleClose, children }: CustomMenuProps) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [buttonRef, handleClose]);
 
-  if (!buttonRef || !position) return null;
-
   return (
     <div
       ref={menuContainerRef}
       className="absolute z-50 bg-white rounded-md py-2 shadow-md"
       style={{
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        // position: "absolute",
+        top: position?.top ?? -9999,
+        left: position?.left ?? -9999,
+        visibility: position ? "visible" : "hidden",
       }}
     >
       {children}
