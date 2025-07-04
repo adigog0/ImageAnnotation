@@ -11,14 +11,15 @@ import HidePathsIcon from "../../assets/icons/noDraw.svg?react";
 import ViewAllCommentsIcon from "../../assets/icons/viewAll.svg?react";
 import { useMetaDataCtx } from "../../pages/ImageDetailsPage";
 import { useAnnotatorContext } from "../../context/AnnotatorContext";
+import useScreenSize from "../../hooks/useScreenSize";
 
 export type ActionTypes =
   | "Add comment"
   | "Nearest tags"
   | "Hide comments"
   | "Draw"
-  | "Save comments"
   | "Hide Paths"
+  | "Save comments"
   | "All comments";
 
 interface ActionToolbarProps {
@@ -28,7 +29,9 @@ interface ActionToolbarProps {
 }
 
 const ActionToolbar: React.FC<ActionToolbarProps> = ({ handleSelectedAction, className, actionIcons = {} }) => {
+  //hook
   const { selectedAction, enableDrawing } = useAnnotatorContext();
+  const screenSize = useScreenSize();
 
   //consts
   const getIcon = (label: ActionTypes) => {
@@ -63,7 +66,7 @@ const ActionToolbar: React.FC<ActionToolbarProps> = ({ handleSelectedAction, cla
   const ActionArr: ActionTypes[] = [
     "All comments",
     "Add comment",
-    "Nearest tags",
+    ...(screenSize === "medium" || screenSize === "large" ? (["Nearest tags"] as ActionTypes[]) : []),
     "Hide comments",
     ...(enableDrawing ? (["Draw"] as ActionTypes[]) : []),
     "Hide Paths",
@@ -77,7 +80,7 @@ const ActionToolbar: React.FC<ActionToolbarProps> = ({ handleSelectedAction, cla
           <button
             id={label}
             className={cn(
-              "bg-gray-700 border border-gray-400 p-1 rounded-xl hover:bg-blue-100 hover:text-gray-800",
+              "bg-gray-700  p-1 rounded-xl hover:bg-blue-100 hover:text-gray-800 bg-",
               selectedAction && selectedAction !== "Save comments" && selectedAction === label
                 ? "bg-blue-300"
                 : "bg-gray-700"

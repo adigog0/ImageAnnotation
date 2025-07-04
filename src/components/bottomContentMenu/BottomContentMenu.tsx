@@ -45,54 +45,56 @@ const BottomCommentMenu = ({
   return (
     <>
       {isOpen && (
-        <div
-          className={cn("fixed top-0 left-0 right-0 bottom-0 z-[1000] bg-[rgba(0,0,0,0.3)]", overlayClassName)}
-          onClick={() => allowCloseOnOverlayClick && handleCloseMenu()}
-        />
+        <>
+          <div
+            className={cn("fixed top-0 left-0 right-0 bottom-0 z-[1000] bg-[rgba(0,0,0,0.3)]", overlayClassName)}
+            onClick={() => allowCloseOnOverlayClick && handleCloseMenu()}
+          />
+          <div
+            className={cn(
+              "fixed left-0 right-0 p-4 bg-white shadow-lg rounded-t-xl z-[1001] transition-all duration-300",
+              menuClassName
+            )}
+            style={{ bottom: isOpen ? 0 : "-50vh" }}
+          >
+            {/* Header */}
+            <div className="mb-2 flex justify-between items-center font-semibold text-lg">
+              <span>{subComments.length > 0 ? "Comments" : "Add a comment"}</span>
+              <button onClick={handleCloseMenu} className="hover:bg-gray-200 rounded-md p-1">
+                <CloseIcon fill="gray" className="size-4" />
+              </button>
+            </div>
+
+            {/* Render external comment list if passed */}
+            {renderCustomComments ? (
+              renderCustomComments
+            ) : curSelectedMetaDataId ? (
+              <CommentListDisplay comments={subComments} />
+            ) : (
+              <>
+                <textarea
+                autoFocus
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Type your comment here..."
+                  className="w-full resize-none p-2 text-base border rounded-lg border-gray-300 outline-none"
+                  rows={3}
+                />
+                <button
+                  onClick={handleAddComment}
+                  disabled={comment.trim() === ""}
+                  className={cn(
+                    "mt-3 w-full py-2 px-4 rounded-lg text-white",
+                    comment.trim() === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                  )}
+                >
+                  {doneButtonLabel}
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
-
-      <div
-        className={cn(
-          "fixed left-0 right-0 p-4 bg-white shadow-lg rounded-t-xl z-[1001] transition-all duration-300",
-          menuClassName
-        )}
-        style={{ bottom: isOpen ? 0 : "-50vh" }}
-      >
-        {/* Header */}
-        <div className="mb-2 flex justify-between items-center font-semibold text-lg">
-          <span>{subComments.length > 0 ? "Comments" : "Add a comment"}</span>
-          <button onClick={handleCloseMenu} className="hover:bg-gray-200 rounded-md p-1">
-            <CloseIcon fill="gray" className="size-4" />
-          </button>
-        </div>
-
-        {/* Render external comment list if passed */}
-        {renderCustomComments ? (
-          renderCustomComments
-        ) : curSelectedMetaDataId ? (
-          <CommentListDisplay comments={subComments} />
-        ) : (
-          <>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Type your comment here..."
-              className="w-full resize-none p-2 text-base border rounded-lg border-gray-300 outline-none"
-              rows={3}
-            />
-            <button
-              onClick={handleAddComment}
-              disabled={comment.trim() === ""}
-              className={cn(
-                "mt-3 w-full py-2 px-4 rounded-lg text-white",
-                comment.trim() === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-              )}
-            >
-              {doneButtonLabel}
-            </button>
-          </>
-        )}
-      </div>
     </>
   );
 };

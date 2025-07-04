@@ -19,7 +19,7 @@ const AddAnnotation = ({ offsetValues, handleAddMetadata }: IProps) => {
 
   return (
     <div
-      className=" absolute flex gap-2 -translate-y-full min-w-[15rem]"
+      className=" absolute lg:flex gap-2 -translate-y-full min-w-[15rem] hidden"
       style={offsetValues ? { top: `${offsetValues.y}%`, left: `${offsetValues.x}%` } : {}}
       onClick={(e) => e.stopPropagation()}
     >

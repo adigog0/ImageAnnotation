@@ -11,6 +11,7 @@ import Stroke3 from "../../assets/icons/stroke3.svg?react";
 import Stroke4 from "../../assets/icons/stroke4.svg?react";
 import EraseIcon from "../../assets/icons/Eraser.svg?react";
 import ColorPickerButton from "../colorPickerButton/ColorPickerButton";
+import { useDebounce } from "../../hooks/useDebounce";
 
 export type SketchActions = "Redo" | "Undo" | "Cancel" | "Done";
 export type SketchOptions = "Erase" | "Pen" | "pick color";
@@ -58,20 +59,26 @@ const SketchCanvas = ({
   const [strokeColor, setStrokeColor] = useState(drawingOptions?.strokeColor ?? "#000000");
   const [sketchOptions, setSketchOptions] = useState<SketchOptions | null>("Pen");
   const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+  const [isStrokeMenuOpen, setIsStrokeMenuOpen] = useState(false);
 
   //hooks
   const canvasRef = useRef<ReactSketchCanvasRef>(null);
+  const strokeMenuRef = useRef<HTMLDivElement | null>(null);
+  const debouncedUpdatePathRef = useRef<(paths: CanvasPath[]) => void | null>(null);
+  const debouncedUpdatePath = useDebounce((paths: CanvasPath[]) => {
+    handleUpdatePath(paths);
+  }, 300);
 
   //consts
   const defaultStrokeIcons: Record<number, React.ReactNode> = {
-    2: <Stroke1 className="size-6 cursor-pointer fill-amber-50" />,
-    5: <Stroke2 className="size-6 cursor-pointer fill-amber-50" />,
-    10: <Stroke3 className="size-6 cursor-pointer fill-amber-50" />,
-    15: <Stroke4 className="size-6 cursor-pointer fill-amber-50" />,
+    2: <Stroke1 className="size-6 cursor-pointer fill-gray-500" />,
+    5: <Stroke2 className="size-6 cursor-pointer fill-gray-500" />,
+    10: <Stroke3 className="size-6 cursor-pointer fill-gray-500" />,
+    15: <Stroke4 className="size-6 cursor-pointer fill-gray-500" />,
   };
 
   const sketchActions: { label: SketchActions; icon: React.ReactNode }[] = [
-    { label: "Cancel", icon: toolbarOptions?.topToolbarIcons?.Cancel ?? <CancelIcon fill="white" /> },
+    // { label: "Cancel", icon: toolbarOptions?.topToolbarIcons?.Cancel ?? <CancelIcon fill="white" /> },
     { label: "Redo", icon: toolbarOptions?.topToolbarIcons?.Redo ?? <RedoIcon fill="white" /> },
     { label: "Undo", icon: toolbarOptions?.topToolbarIcons?.Undo ?? <UndoIcon fill="white" /> },
     { label: "Done", icon: toolbarOptions?.topToolbarIcons?.Done ?? <DoneIcon fill="white" /> },
@@ -123,7 +130,9 @@ const SketchCanvas = ({
       case "Pen":
         setSketchOptions("Pen");
         canvasRef.current?.eraseMode(false);
+        console.log("w value", value);
         setStrokeWidth(value as number);
+        setIsStrokeMenuOpen(false);
         break;
       case "pick color":
         setStrokeColor(value as string);
@@ -262,10 +271,28 @@ const SketchCanvas = ({
     };
   }, [sketchOptions]);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (strokeMenuRef.current && !strokeMenuRef.current.contains(event.target as Node)) {
+        setIsStrokeMenuOpen(false);
+      }
+    }
+
+    if (isStrokeMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isStrokeMenuOpen]);
+
+
   return (
     <>
       <ReactSketchCanvas
         id="current_image"
+        key={`${strokeColor}-${strokeWidth}`}
         className={cn("rounded-md", sketchOptions === "Erase" && "cursor-none")}
         style={sketchCanvasStyle}
         width="100%"
@@ -276,67 +303,81 @@ const SketchCanvas = ({
         backgroundImage={image_url}
         strokeColor={strokeColor}
         strokeWidth={strokeWidth}
-        onStroke={(path, isEraser) => {
+        onStroke={async (path, isEraser) => {
           if (isEraser) {
             handleStrokeEnd(path.paths);
+          } else if (canvasRef.current) {
+            const paths = await canvasRef.current.exportPaths();
+            debouncedUpdatePath(paths);
           }
         }}
       />
 
-      {inDrawMode && (
-        <>
-          <div
-            className={cn(
-              "absolute -bottom-10 left-1/2 -translate-x-1/2 flex gap-2",
-              isDrawing ? "opacity-0 pointer-events-none" : "opacity-100"
-            )}
-            style={toolbarOptions?.bottomToolbarStyle}
-          >
-            <ColorPickerButton onChange={(val) => handleDrawOptions("pick color", val)} strokeColor={strokeColor} />
+      {inDrawMode && !isDrawing && (
+        <div
+          className={cn(
+            "fixed md:absolute top-3 md:-top-25 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 p-2 backdrop-blur-md shadow-md rounded-xl",
+            toolbarOptions?.bottomToolbarStyle
+          )}
+        >
+          {/* Color Picker */}
+          <ColorPickerButton onChange={(val) => handleDrawOptions("pick color", val)} strokeColor={strokeColor} />
 
+          {/* Eraser */}
+          <button
+            onClick={() => handleDrawOptions("Erase")}
+            className={cn(
+              "p-1 rounded-xl border border-transparent hover:border-gray-400",
+              sketchOptions === "Erase" ? "bg-blue-300" : "bg-gray-700"
+            )}
+          >
+            {toolbarOptions?.strokeIcons?.eraserIcon ?? (
+              <EraseIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />
+            )}
+          </button>
+
+          {/* Stroke Width Dropdown */}
+          <div className="relative group" ref={strokeMenuRef}>
             <button
-              onClick={() => handleDrawOptions("Erase")}
-              className={cn(
-                "p-1 rounded-xl cursor-pointer border border-transparent hover:border-gray-400",
-                sketchOptions === "Erase" ? "bg-blue-300" : "bg-gray-700"
-              )}
+              className="p-1 rounded-xl bg-gray-700 hover:border-gray-400 cursor-pointer"
+              onClick={() => setIsStrokeMenuOpen((prev) => !prev)}
             >
-              {toolbarOptions?.strokeIcons?.eraserIcon ?? (
-                <EraseIcon className="cursor-pointer fill-amber-50 hover:fill-gray-800" />
-              )}
+              ✏️
             </button>
-            {Object.entries(toolbarOptions?.strokeIcons?.strokeWidthIcons ?? defaultStrokeIcons).map(([w, icon]) => (
-              <button
-                key={w}
-                className={cn(
-                  "rounded-xl p-1 cursor-pointer border border-transparent hover:border-gray-400",
-                  sketchOptions === "Pen" && strokeWidth === Number(w) ? "bg-blue-300" : "bg-gray-700"
+            {isStrokeMenuOpen && (
+              <div className="absolute top-full bg-gray-100 mt-1 left-1/2 -translate-x-1/2 border rounded-md shadow-md p-1 z-50 cursor-pointer">
+                {Object.entries(toolbarOptions?.strokeIcons?.strokeWidthIcons ?? defaultStrokeIcons).map(
+                  ([w, icon]) => (
+                    <button
+                      key={w}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDrawOptions("Pen", Number(w));
+                      }}
+                      className={cn(
+                        "p-1 block w-full text-left rounded cursor-pointer hover:bg-blue-200",
+                        sketchOptions === "Pen" && strokeWidth === Number(w) ? "bg-blue-200" : ""
+                      )}
+                    >
+                      {icon}
+                    </button>
+                  )
                 )}
-                onClick={() => handleDrawOptions("Pen", Number(w))}
-              >
-                {icon}
-              </button>
-            ))}
+              </div>
+            )}
           </div>
 
-          <div
-            className={cn(
-              "absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2",
-              isDrawing ? "opacity-0 pointer-events-none" : "opacity-100"
-            )}
-            style={toolbarOptions?.bottomToolbarStyle}
-          >
-            {sketchActions.map(({ label, icon }) => (
-              <button
-                key={label}
-                onClick={() => handleSelectedAction(label)}
-                className="bg-gray-700 p-1 rounded-xl cursor-pointer border border-transparent hover:border-gray-400"
-              >
-                {icon}
-              </button>
-            ))}
-          </div>
-        </>
+          {/* Other Drawing Actions */}
+          {sketchActions.map(({ label, icon }) => (
+            <button
+              key={label}
+              onClick={() => handleSelectedAction(label)}
+              className="p-1 rounded-xl bg-gray-700 border border-transparent hover:border-gray-400 cursor-pointer"
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
       )}
 
       {sketchOptions === "Erase" && pointerPos && (
@@ -347,6 +388,7 @@ const SketchCanvas = ({
             height: `${strokeWidth * 2}px`,
             left: pointerPos.x - strokeWidth,
             top: pointerPos.y - strokeWidth,
+            transition: "left 30ms linear, top 30ms linear",
           }}
         />
       )}

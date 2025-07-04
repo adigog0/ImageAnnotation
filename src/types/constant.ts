@@ -25,7 +25,6 @@ export interface AnnotatorProps {
   image_alt: string;
 
   // Commenting
-  enableCommenting?: boolean;
   initial_Annotations?: MetaData[];
   onCommentAdd?: (comment: MetaData) => void;
   onReplyAdd?: (reply: MetaData, parentId: string) => void;
@@ -35,7 +34,8 @@ export interface AnnotatorProps {
   commentOptionMenuStyle?: React.CSSProperties;
   onDelete: (metadata_id: string) => void;
   onEdit: (metadata_id: string) => void;
-  commentItems: React.ReactNode;
+  commentItems?: React.ReactNode;
+  disableAnnotationDragging?: boolean;
 
   // Toolbar
   actionIcons?: Partial<Record<ActionTypes, React.ReactNode>>;

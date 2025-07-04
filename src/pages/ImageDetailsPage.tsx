@@ -427,22 +427,25 @@ export const ImageDetailsPage = () => {
     //   </div>
     // </imageMetaDataCtx.Provider>
 
-    <Annotator
-      image_alt="image"
-      image_url={imageData?.image_url ?? ""}
-      // maxHeight={MAX_HEIGHT}
-      // maxWidth={MAX_WIDTH}
-      onDelete={(val) => console.log("delete triggered", val)}
-      onEdit={(val) => console.log("edit", val)}
-      currentUserId="Unknown"
-      drawingOptions={{
-        strokeColor: "blue",
-        strokeWidth: 10,
-      }}
-      actionToolbarStyle={{
-        backgroundColor: "red",
-      }}
-    />
+    // <div className="h-dvh flex">
+    //   <div className="w-[30rem] bg-white h-full hidden md:block">sidebar</div>
+    //   <div className=" flex-1 border">
+        <Annotator
+          image_alt="image"
+          image_url={imageData?.image_url ?? ""}
+          // maxHeight={MAX_HEIGHT}
+          // maxWidth={MAX_WIDTH}
+          onDelete={(val) => console.log("delete triggered", val)}
+          onEdit={(val) => console.log("edit", val)}
+          currentUserId="Unknown"
+          drawingOptions={{
+            strokeColor: "blue",
+            strokeWidth: 10,
+          }}
+          enableDrawing
+        />
+    //   </div>
+    // </div>
   );
 };
 export default ImageDetailsPage;

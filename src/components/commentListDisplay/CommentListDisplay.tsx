@@ -41,6 +41,7 @@ const CommentListDisplay = ({ comments }: CommentListDisplayProps) => {
   }
 
   function handleOpenOptionMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation()
     setMenuAnchor(e.currentTarget);
   }
 
@@ -70,23 +71,14 @@ const CommentListDisplay = ({ comments }: CommentListDisplayProps) => {
 
   const parentData = comments.find((c) => c.metadata_id === curSelectedMetaDataId);
   if (!parentData) return null;
-  
+
   return (
     <div className="flex gap-3 relative ">
-      <div
-        className={cn(
-          "bg-white p-1 rounded-t-3xl rounded-br-3xl h-fit",
-          parentData.metadata_id === curSelectedMetaDataId ? "border-2 border-blue-400" : "bg-white"
-        )}
-      >
-        <div className="bg-blue-400  text-white p-1 px-2.5 h-fit capitalize rounded-full">
-          {parentData.created_by[0]}
-        </div>
-      </div>
+
       {/** desktop view menu */}
       <div
         className={cn(
-          "bg-white p-2 rounded-md  flex-col gap-2 absolute left-13 hidden md:block",
+          "bg-white p-2 rounded-md  flex-col gap-2 absolute hidden lg:block",
           curSelectedMetaDataId === parentData.metadata_id ? "z-20" : "z-10"
         )}
       >
@@ -95,7 +87,7 @@ const CommentListDisplay = ({ comments }: CommentListDisplayProps) => {
           <button
             data-menu-type="parent"
             // id={`parent_comment_options_${curSelectedMetaDataId}`}
-            className="ml-auto  hover:bg-gray-200 rounded-md relative"
+            className="ml-auto  hover:bg-gray-200 rounded-md relative cursor-pointer"
             onClick={handleOpenOptionMenu}
           >
             <OptionIcon className="ml-auto size-4 cursor-pointer" fill="gray" />
@@ -121,6 +113,19 @@ const CommentListDisplay = ({ comments }: CommentListDisplayProps) => {
       </div>
 
       {/** mobile view  - when a comment is selected*/}
+      <div className="max-h-90 overflow-auto block lg:hidden w-full">
+        {comments.map((c) => (
+          <CommentCard
+            key={c.metadata_id}
+            type="fromTag"
+            comment={c}
+            curSelectedMetaDataId={curSelectedMetaDataId ?? ""}
+          />
+        ))}
+        <div ref={endRef}></div>
+        <CommentInputBox handleInputValue={handleAddSubComment} input_placeholder="Reply" initial_value="" />
+      </div>
+
       <CustomMenu handleClose={handleCloseOptionMenu} buttonRef={menuAnchor}>
         <div className="flex flex-col w-full">
           {handleGenerateCommentOptions().map((c) => (

@@ -9,7 +9,7 @@ interface IProps {
   disableDrag?: boolean;
 }
 
-const MetaDataAnnotationLayer = ({ handleClickMetaData, commentItems, disableDrag }: IProps) => {
+const MetaDataAnnotationLayer = ({ handleClickMetaData, commentItems, disableDrag = false }: IProps) => {
   const { curSelectedMetaDataId, metaData, setMetaData, handleAddComment } = useAnnotatorContext();
 
   //consts
@@ -66,6 +66,7 @@ const MetaDataAnnotationLayer = ({ handleClickMetaData, commentItems, disableDra
                 disableDrag
                   ? undefined
                   : (e) => {
+                      e.stopPropagation();
                       e.dataTransfer.setData("text/plain", v.metadata_id);
                       e.dataTransfer.effectAllowed = "move";
                     }

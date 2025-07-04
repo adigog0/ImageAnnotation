@@ -24,8 +24,8 @@ export function getResponsiveDefaults() {
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   return {
-    maxWidth: isMobile ? 600 : 1120,
-    maxHeight: isMobile ? 580 : 720,
+    maxWidth: isMobile ? 700 : 1120,
+    maxHeight: isMobile ? 650 : 720,
   };
 }
 

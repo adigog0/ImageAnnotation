@@ -31,9 +31,14 @@ const PathOverlay = ({
   const getPathD = (points: { x: number; y: number }[]) =>
     points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" ");
 
+  function handleDeselectPath() {
+    setHoveredIndex(null);
+    setTooltipPos(null);
+  }
+
   return (
     <div className="absolute top-0 left-0" style={{ width: canvasWidth, height: canvasHeight }}>
-      <svg width={canvasWidth} height={canvasHeight} className="w-full h-full relative">
+      <svg width={canvasWidth} height={canvasHeight} className="w-full h-full relative" onClick={handleDeselectPath}>
         {!hideAllPaths &&
           paths.map((path, index) => {
             const denormPoints = path.paths.map(denormalize);
@@ -69,11 +74,12 @@ const PathOverlay = ({
                       setTooltipPos({ x: e.clientX - box.left, y: e.clientY - box.top });
                     }
                   }}
-                  onMouseLeave={() => {
-                    setHoveredIndex(null);
-                    setTooltipPos(null);
-                  }}
+                  // onMouseLeave={() => {
+                  //   setHoveredIndex(null);
+                  //   setTooltipPos(null);
+                  // }}
                   onClick={(e) => {
+                    e.stopPropagation();
                     const box = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
                     if (box) {
                       setTooltipPos({ x: e.clientX - box.left, y: e.clientY - box.top });

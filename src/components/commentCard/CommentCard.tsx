@@ -36,19 +36,26 @@ const CommentCard = ({
   const [menuAnchor, setMenuAnchor] = useState<HTMLButtonElement | null>(null);
 
   //context
-  const { hideAllMetadata, handleDeleteMetaData, onEdit } = useAnnotatorContext();
+  const { hideAllMetadata, handleDeleteMetaData, onEdit ,setSelectedAction} = useAnnotatorContext();
 
   //consts
   const { metadata_id, created_by, created_at, metadata_value } = comment;
   const isParentComment = comment.parent_id === null;
   const commentOptions: CommentOption[] = isParentComment ? ["Hide comments", "Delete"] : ["Edit", "Delete"];
   const optionsHandlerMap: CommentHandlerMap = {
-    "Hide comments": hideAllMetadata,
+    "Hide comments": handleHideComment,
     Delete: handleDeleteMetaData,
     Edit: onEdit,
   };
 
   //handlers
+
+  function handleHideComment(){
+    hideAllMetadata();
+    setSelectedAction("Hide comments")
+
+  }
+  
   function handleOpenOptionMenu(e: React.MouseEvent<HTMLButtonElement>) {
     setMenuAnchor(e.currentTarget);
   }
@@ -101,7 +108,8 @@ const CommentCard = ({
               <span
                 key={option}
                 className="text-xs hover:bg-gray-200 py-1 px-5 w-full"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   optionsHandlerMap[option]?.(metadata_id);
                   handleCloseOptionMenu();
                 }}
