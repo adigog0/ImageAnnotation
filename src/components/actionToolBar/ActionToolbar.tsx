@@ -66,7 +66,7 @@ const ActionToolbar: React.FC<ActionToolbarProps> = ({ handleSelectedAction, cla
   const ActionArr: ActionTypes[] = [
     "All comments",
     "Add comment",
-    ...(screenSize === "medium" || screenSize === "large" ? (["Nearest tags"] as ActionTypes[]) : []),
+    ...(screenSize === "large" ? (["Nearest tags"] as ActionTypes[]) : []),
     "Hide comments",
     ...(enableDrawing ? (["Draw"] as ActionTypes[]) : []),
     "Hide Paths",

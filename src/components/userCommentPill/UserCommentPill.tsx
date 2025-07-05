@@ -102,7 +102,7 @@ const UserCommentPill = ({ metadata, isSelected, comments = [], onReply }: UserC
         <div
           ref={menuRef}
           className={cn(
-            "bg-white p-2 rounded-md flex-col gap-2 absolute left-10 top-0 z-20 w-[20rem] shadow-lg hidden md:block"
+            "bg-white p-2 rounded-md flex-col gap-2 absolute left-10 top-0 z-20 w-[20rem] shadow-lg hidden lg:block"
           )}
         >
           <div className="flex justify-between items-center py-1">

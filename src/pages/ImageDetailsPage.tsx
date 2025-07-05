@@ -439,7 +439,7 @@ export const ImageDetailsPage = () => {
           onEdit={(val) => console.log("edit", val)}
           currentUserId="Unknown"
           drawingOptions={{
-            strokeColor: "blue",
+            strokeColor: "#0000FF",
             strokeWidth: 10,
           }}
           enableDrawing

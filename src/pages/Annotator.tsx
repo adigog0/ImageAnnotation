@@ -70,7 +70,7 @@ const Annotator = ({
   }, [curSelectedMetaDataId, metaData]);
 
   const shouldShowSidebar = () => {
-    if (screenSize === "small") {
+    if (screenSize === "small" || screenSize === "medium") {
       return selectedAction === "All comments";
     } else {
       return selectedAction === "All comments" || curSelectedMetaDataId !== null;
@@ -140,6 +140,7 @@ const Annotator = ({
       if (el instanceof HTMLElement) el.style.visibility = "hidden";
     });
     setCurSelectedMetaDataId(null);
+    setOpenBottomMenu(false)
   }
 
   function showAllMetadata() {

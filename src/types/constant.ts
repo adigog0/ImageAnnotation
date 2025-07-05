@@ -46,6 +46,7 @@ export interface AnnotatorProps {
   initial_Paths?: CanvasPath[];
   onPathsChange?: (paths: CanvasPath[]) => void;
   drawingOptions?: {
+    /** Stroke color in Hex format */
     strokeColor?: string;
     strokeWidth?: number;
   };
